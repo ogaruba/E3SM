@@ -30,6 +30,10 @@ module input_data_utils
      integer :: fixed_ymd, fixed_tod
      character(len=cl) :: filename
      real(r8) :: dtime ! time shift in interpolation point (days)
+!++BEH
+     logical  :: cyclical = .false.
+     real(r8) :: total_time
+!--BEH
    contains
      procedure :: initialize
      procedure :: advance
@@ -38,12 +42,16 @@ module input_data_utils
      procedure :: destroy
   end type time_coordinate
 
+!++BEH
+  real(r8), parameter ::  days_per_year = 365.0_r8
+!--BEH
+
 contains
 
   !-----------------------------------------------------------------------------
   ! initializer
   !-----------------------------------------------------------------------------
-  subroutine initialize( this, filepath, fixed, fixed_ymd, fixed_tod, force_time_interp, set_weights, try_dates, delta_days )
+  subroutine initialize( this, filepath, fixed, fixed_ymd, fixed_tod, force_time_interp, set_weights, try_dates, delta_days, cyclical, num_file_years)
     use ioFileMod,      only : getfil
     use cam_pio_utils,  only : cam_pio_openfile, cam_pio_closefile
     use string_utils,   only : to_upper
@@ -57,6 +65,8 @@ contains
     logical, optional,intent(in) :: set_weights
     logical, optional,intent(in) :: try_dates
     real(r8), optional,intent(in) :: delta_days !  time shift in interpolation point (days) -- for previous day set this to -1.
+    logical,  optional, intent(in) :: cyclical
+    real(r8), optional, intent(in) :: num_file_years ! BEH add a namelist option to specify the number of years in the cyclical file
 
     character(len=cl) :: filen
     character(len=cl) :: time_units, err_str
@@ -84,6 +94,20 @@ contains
 
     this%dtime = 0._r8
     if (present(delta_days)) this%dtime = delta_days
+
+    !++BEH
+    if (present(cyclical)) then
+       this%cyclical = cyclical
+       this%total_time = 1._r8
+       if (present(num_file_years)) then
+          this%total_time = days_per_year * num_file_years
+          if (masterproc) then
+             write(iulog,*) 'file total_time is '
+             write(iulog,*) this%total_time
+          end if
+       endif
+    end if
+    !--BEH
 
     if (present(force_time_interp)) then
        force_interp = force_time_interp
@@ -197,8 +221,8 @@ contains
           time_bnds_file = time_bnds_file + ref_time
           this%time_interp = .false.
           do i = 1,this%ntimes
-            if (.not. (time_bnds_file(1,i)<times_file(i) &
-                 .and. time_bnds_file(2,i)>times_file(i)) ) then
+            if (.not. (time_bnds_file(1,i)<=times_file(i) &
+                 .and. time_bnds_file(2,i)>=times_file(i)) ) then
                 write(err_str,*) 'incorrect time_bnds -- time index: ',i,' file: '//trim(filepath)
                 call endrun(err_str)
             endif
@@ -270,7 +294,17 @@ contains
     call cam_pio_closefile(fileid)
 
     this%indxs(1)=1
+!BEH    if (set_wghts) call set_wghts_indices(this)
+!BEH: do I need cyclical logic here?  Presumably during initialization,
+!     we should still start the same way in the file, unless the model year
+!     begins outside of the file year range.
+!++BEH
+    if (this%cyclical) then
+       if (set_wghts) call set_wghts_indices_cyclical(this)
+    else
     if (set_wghts) call set_wghts_indices(this)
+    end if
+!--BEH
 
   end subroutine initialize
 
@@ -280,7 +314,16 @@ contains
   subroutine advance( this )
     class(time_coordinate) :: this
 
-    if (.not.this%fixed) call set_wghts_indices(this)
+!BEH    if (.not.this%fixed) call set_wghts_indices(this)
+!++BEH
+    if (.not.this%fixed) then
+       if (this%cyclical) then
+          call set_wghts_indices_cyclical(this)
+       else
+          call set_wghts_indices(this)
+       end if
+    end if
+!--BEH
 
   end subroutine advance
 
@@ -298,8 +341,20 @@ contains
     if (.not.this%fixed) then
        if (allocated(this%time_bnds)) then
           check = model_time > this%time_bnds(2,this%indxs(1))
+!++BEH
+          if (masterproc) then
+             write(iulog,*) 'time_bnds was set; model time is '
+             write(iulog,*)  model_time
+          end if
+!--BEH
        else
           check = model_time > this%times(this%indxs(2))
+!++BEH
+          if (masterproc) then
+             write(iulog,*) 'no time_bnds; model time is '
+             write(iulog,*) model_time
+          end if
+!--BEH
        endif
     else
        check = .false.
@@ -423,6 +478,123 @@ contains
     endif
 
   end subroutine set_wghts_indices
+
+!++BEH
+  subroutine set_wghts_indices_cyclical(obj)
+
+    class(time_coordinate), intent(inout) :: obj
+
+    real(r8)          :: model_time
+    real(r8)          :: model_time_temp, offset_time !BEH
+    real(r8)          :: datatm, datatp
+    integer           :: yr, mon, day
+    integer           :: index, i
+    character(len=cl) :: errmsg
+
+    ! set time indices and time-interpolation weights 
+    ! BEH I don't know what the point of this is... set_wghts_indices and 
+    ! set_wghts_indices_cyclical are only called if obj%fixed is .false.
+    fixed_time: if (obj%fixed) then
+       yr  = obj%fixed_ymd/10000
+       mon = (obj%fixed_ymd-yr*10000) / 100
+       day = obj%fixed_ymd-yr*10000-mon*100
+       call set_time_float_from_date( model_time, yr, mon, day, obj%fixed_tod )
+       model_time = model_time + obj%dtime
+    else
+       model_time = get_model_time() + obj%dtime
+       !++BEH
+       offset_time = floor( (model_time - obj%times(1)) / (obj%total_time) )
+       model_time_temp = model_time - offset_time * (obj%total_time)
+       !--BEH
+    endif fixed_time
+
+    index = -1
+
+!BEH Do I need to redo the start index?  If the previous timestep had the wrap around, 
+!    then indxs(1) should be the end of the file, and would need to be reset.
+    if (obj%indxs(1) .eq. obj%ntimes) obj%indxs(1) = 1 ! BEH reset to beginning of file
+    if (model_time_temp .lt. obj%times(obj%indxs(1))) obj%indxs(1) = 1
+    findtimes: do i = obj%indxs(1), obj%ntimes !BEH: ntimes is the dimension size of 'time'
+       if (allocated(obj%time_bnds)) then !BEH: time_bnds does not get set in prescribed_cloud or sfc fluxes
+          datatm = obj%time_bnds(1,i)
+          datatp = obj%time_bnds(2,i)
+       else
+          if (i .ge. obj%ntimes) then
+             !BEH: we don't want to error out, but we want to break the loop.
+!BEH             errmsg = 'input_data_utils::set_wghts_indices cannot not find model time in: '&
+!BEH                    // trim(obj%filename)
+!BEH             write(iulog,*) trim(errmsg)
+!BEH             call endrun(trim(errmsg))
+             index        = obj%ntimes
+             obj%indxs(1) = obj%ntimes
+             obj%indxs(2) = 1            !BEH IS THIS CORRECT????
+             exit findtimes
+          endif
+          datatm = obj%times(i)
+          datatp = obj%times(i+1)
+       endif
+!BEH       if ( model_time .lt. datatm ) then
+       if ( model_time_temp .lt. datatm ) then
+!++BEH
+          write(iulog,*) 'The weights, and times, and indexes are '
+          write(iulog,*) obj%wghts(1), obj%wghts(2), model_time, &
+                obj%times(obj%indxs(1)), obj%times(obj%indxs(2)), &
+                obj%indxs(1), obj%indxs(2), model_time_temp, offset_time, &
+                datatm, datatp, obj%total_time
+!--BEH
+          errmsg = 'input_data_utils::set_wghts_indices_cyclical cannot not find model time in: '&
+                 // trim(obj%filename)
+          write(iulog,*) trim(errmsg)
+          call endrun(trim(errmsg))
+       endif
+!BEH       if ( model_time .ge. datatm .and. model_time .le. datatp ) then
+       if ( model_time_temp .ge. datatm .and. model_time_temp .le. datatp ) then
+          index = i
+          obj%indxs(1) = i
+          obj%indxs(2) = i+1
+          exit findtimes
+       endif
+    enddo findtimes
+
+    if ((allocated(obj%time_bnds)) .and. (i<obj%ntimes)) then
+       if (.not.(obj%time_bnds(1,i+1) > obj%time_bnds(1,i))) then
+          obj%indxs = obj%indxs+1  ! skip 29 Feb when calendar is noleap
+       endif
+    endif
+
+!BEH    if (.not.(index>0.and.index<obj%ntimes)) then
+!    if (.not.(index>0.and.index.le.obj%ntimes)) then !BEH allow index to equal obj%ntimes without failure
+    if ( (.not.(index>0)) .and. (index>obj%ntimes) ) then ! BEH try again to let index equal obj%ntimes?
+       errmsg = 'input_data_utils::set_wghts_indices cannot not find time indices for input file: '&
+            // trim(obj%filename)
+       write(iulog,*) trim(errmsg)
+       call endrun(trim(errmsg))
+    endif
+
+    if (obj%time_interp) then
+       !++BEH
+       if (obj%indxs(2) < obj%indxs(1)) then
+!          obj%indxs(2) = obj%indxs(2) + obj%total_time
+          obj%wghts(2) = ( model_time_temp - obj%times(obj%indxs(1)) ) / &
+               ( obj%times(obj%indxs(2)) + obj%total_time - obj%times(obj%indxs(1)) )
+       else
+          obj%wghts(2) = ( model_time_temp - obj%times(index) ) / ( obj%times(index+1) - obj%times(index) )
+       endif
+       !--BEH
+!BEH       obj%wghts(2) = ( model_time - obj%times(index) ) / ( obj%times(index+1) - obj%times(index) )
+       obj%wghts(1) = 1._r8 - obj%wghts(2)
+    else
+       obj%wghts(1) = 1._r8
+       obj%wghts(2) = 0._r8       
+    endif
+    if (masterproc) then
+       write(iulog,*) 'The weights, and times, and indexes are '
+       write(iulog,*) obj%wghts(1), obj%wghts(2), model_time, &
+            obj%times(obj%indxs(1)), obj%times(obj%indxs(2)), &
+            obj%indxs(1), obj%indxs(2), model_time_temp, offset_time
+    endif
+  end subroutine set_wghts_indices_cyclical
+!--BEH
 
   !-----------------------------------------------------------------------
   ! returns dimension size

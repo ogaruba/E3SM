@@ -3674,6 +3674,34 @@ Convective water used in radiation?
 Default: set by build-namelist
 </entry>
 
+<entry id="no_cloud_lw_radheat_atm" type="logical" category="radiation"
+       group="phys_ctl_nl" valid_values="">
+  If set to .true., remove longwave cloud radiative heating from atm energy tend
+  If set to .false., longwave cloud radiative heating behaves normally
+  Default: .false.
+</entry>
+
+<entry id="no_cloud_sw_radheat_atm" type="logical" category="radiation"
+       group="phys_ctl_nl" valid_values="">
+  If set to .true., remove shortwave cloud radiative heating from atm energy tend
+  If set to .false., shortwave cloud radiative heating behaves normally
+  Default: .false.
+</entry>
+
+<entry id="no_cloud_lw_radheat_sfc" type="logical" category="radiation"
+       group="phys_ctl_nl" valid_values="">
+  If set to .true., remove longwave cloud radiative heating from sfc energy tend
+  If set to .false., longwave cloud radiative heating behaves normally
+  Default: .false.
+</entry>
+
+<entry id="no_cloud_sw_radheat_sfc" type="logical" category="radiation"
+       group="phys_ctl_nl" valid_values="">
+  If set to .true., remove shortwave cloud radiative heating from sfc energy tend
+  If set to .false., shortwave cloud radiative heating behaves normally
+  Default: .false.
+</entry>
+
 <entry id="iradlw" type="integer"  category="radiation"
        group="radiation_nl" valid_values="">
 Interval of long-wave radiation calculation in timesteps (if positive) or
@@ -4881,6 +4909,120 @@ The time of day (seconds) corresponding to <varname>prescribed_ozone_fixed_ymd</
 at which the prescribed ozone data is fixed
 if <varname>prescribed_ozone_type</varname> is 'FIXED'.
 Default: 0 seconds
+</entry>
+
+<!-- cloud_locking : we add the prescribed cloud definitions here because
+                     they follow the model of prescribed ozone.           -->
+<entry id="prescribed_cloud_datapath" type="char*256" input_pathname="abs"
+       category="cam_chem" group="prescribed_cloud_nl" valid_values="" >
+Full pathname of the directory that contains the files specified in
+<varname>prescribed_cloud_filelist</varname>.
+Default: None, do not prescribe clouds by default.
+</entry>
+
+<entry id="prescribed_cloud_file" type="char*256"
+       input_pathname="rel:prescribed_cloud_datapath" category="cam_chem"
+       group="prescribed_cloud_nl" valid_values="" >
+Filename of dataset for prescribed cloud.
+Default: None, do not prescribe clouds by default.
+</entry>
+
+<entry id="prescribed_cloud_filelist" type="char*256"
+       input_pathname="rel:prescribed_cloud_datapath" category="cam_chem"
+       group="prescribed_cloud_nl" valid_values="" >
+Filename of file that contains a sequence of filenames for prescribed
+cloud.  The filenames in this file are relative to the directory specified
+by <varname>prescribed_cloud_datapath</varname>.
+Default: None, do not prescribe clouds by default.
+</entry>
+
+<entry id="prescribed_cloud_type" type="char*32" category="cam_chem"
+       group="prescribed_cloud_nl"
+       valid_values="CYCLICAL,SERIAL,INTERP_MISSING_MONTHS,FIXED" >
+Type of time interpolation for data in prescribed_cloud files.
+Can be set to 'CYCLICAL', 'SERIAL', 'INTERP_MISSING_MONTHS', or 'FIXED'.
+Default: 'SERIAL'
+</entry>
+
+<entry id="prescribed_cloud_num_file_years" type="real" category="cam_chem"
+       group="prescribed_cloud_nl" valid_values="" >
+The number of years in the prescribed cloud data file
+if <varname>prescribed_cloud_type</varname>  is 'CYCLICAL'.
+Default: 0.0
+</entry>
+
+<!-- sfc_flux_locking : we add the prescribed sfc flux definitions here because
+                        they follow the model of prescribed ozone.           -->
+<entry id="presc_sfc_flux_datapath" type="char*256" input_pathname="abs"
+       category="cam_chem" group="presc_sfc_flux_nl" valid_values="" >
+Full pathname of the directory that contains the files specified in
+<varname>presc_sfc_flux_filelist</varname>.
+Default: None, do not prescribe surface fluxes by default.
+</entry>
+
+<entry id="presc_sfc_flux_file" type="char*256"
+       input_pathname="rel:presc_sfc_flux_datapath" category="cam_chem"
+       group="presc_sfc_flux_nl" valid_values="" >
+Filename of dataset for prescribed surface fluxes.
+Default: None, do not prescribe surface fluxes by default.
+</entry>
+
+<entry id="presc_sfc_flux_type" type="char*32" category="cam_chem"
+       group="presc_sfc_flux_nl"
+       valid_values="CYCLICAL,SERIAL,INTERP_MISSING_MONTHS,FIXED" >
+Type of time interpolation for data in prescribed_sfc flux files.
+Can be set to 'CYCLICAL', 'SERIAL', 'INTERP_MISSING_MONTHS', or 'FIXED'.
+Default: 'SERIAL'
+</entry>
+
+<entry id="presc_sfc_flux_num_file_years" type="real" category="cam_chem"
+       group="presc_sfc_flux_nl" valid_values="" >
+The number of years in the prescribed surface flux data file
+if <varname>presc_sfc_flux_type</varname>  is 'CYCLICAL'.
+Default: 0.0
+</entry>
+
+<entry id="presc_sfc_flux_input_dtime" type="real" category="cam_chem"
+       group="presc_sfc_flux_nl" valid_values="" >
+The atm physics timestep for the run that produced the prescribed surface flux data file (in seconds)
+Default: 0.0
+</entry>
+
+<!-- presc_radheat : we add the prescribed radheat definitions here because
+                        they follow the model of prescribed ozone.           -->
+<entry id="presc_radheat_datapath" type="char*256" input_pathname="abs"
+       category="cam_chem" group="presc_radheat_nl" valid_values="" >
+Full pathname of the directory that contains the files specified in
+<varname>presc_radheat_filelist</varname>.
+Default: None, do not prescribe radiative heating by default.
+</entry>
+
+<entry id="presc_radheat_file" type="char*256"
+       input_pathname="rel:presc_radheat_datapath" category="cam_chem"
+       group="presc_radheat_nl" valid_values="" >
+Filename of dataset for prescribed radiative heating.
+Default: None, do not radiative heating by default.
+</entry>
+
+<entry id="presc_radheat_type" type="char*32" category="cam_chem"
+       group="presc_radheat_nl"
+       valid_values="CYCLICAL,SERIAL,INTERP_MISSING_MONTHS,FIXED" >
+Type of time interpolation for data in prescribed radiative heating files.
+Can be set to 'CYCLICAL', 'SERIAL', 'INTERP_MISSING_MONTHS', or 'FIXED'.
+Default: 'SERIAL'
+</entry>
+
+<entry id="presc_radheat_num_file_years" type="real" category="cam_chem"
+       group="presc_radheat_nl" valid_values="" >
+The number of years in the prescribed radiative heating data file
+if <varname>presc_radheat_type</varname>  is 'CYCLICAL'.
+Default: 0.0
+</entry>
+
+<entry id="presc_radheat_input_dtime" type="real" category="cam_chem"
+       group="presc_radheat_nl" valid_values="" >
+The atm physics timestep for the run that produced the prescribed radiative heating data file (in seconds)
+Default: 0.0
 </entry>
 
 <entry id="prescribed_volcaero_datapath" type="char*256" input_pathname="abs" category="cam_chem"

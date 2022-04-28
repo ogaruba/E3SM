@@ -29,6 +29,9 @@ module physpkg
 
   use cam_control_mod,  only: ideal_phys, adiabatic
   use phys_control,     only: phys_do_flux_avg, phys_getopts, waccmx_is
+  use prescribed_cloud, only: has_prescribed_cloud
+  use prescribed_sfc_flux, only: has_presc_sfc_flux
+  use prescribed_radheat, only:  has_presc_radheat
   use zm_conv,          only: do_zmconv_dcape_ull => trigdcape_ull, &
                               do_zmconv_dcape_only => trig_dcape_only
   use scamMod,          only: single_column, scm_crm_mode
@@ -141,6 +144,9 @@ subroutine phys_register
     use ionosphere,         only: ionos_register
     use string_utils,       only: to_lower
     use prescribed_ozone,   only: prescribed_ozone_register
+    use prescribed_cloud,   only: prescribed_cloud_register
+    use prescribed_sfc_flux,only: presc_sfc_flux_register
+    use prescribed_radheat, only: presc_radheat_register
     use prescribed_volcaero,only: prescribed_volcaero_register
     use prescribed_aero,    only: prescribed_aero_register
     use prescribed_ghg,     only: prescribed_ghg_register
@@ -268,6 +274,9 @@ subroutine phys_register
        end if
        call prescribed_volcaero_register()
        call prescribed_ozone_register()
+       call prescribed_cloud_register()
+       call presc_sfc_flux_register()
+       call presc_radheat_register()
        call prescribed_aero_register()
        call prescribed_ghg_register()
        call sslt_rebin_register
@@ -682,6 +691,9 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
     use check_energy,       only: check_energy_init
     use chemistry,          only: chem_init
     use prescribed_ozone,   only: prescribed_ozone_init
+    use prescribed_cloud,   only: prescribed_cloud_init
+    use prescribed_sfc_flux,only: presc_sfc_flux_init
+    use prescribed_radheat, only: presc_radheat_init
     use prescribed_ghg,     only: prescribed_ghg_init
     use prescribed_aero,    only: prescribed_aero_init
     use seasalt_model,      only: init_ocean_data, has_mam_mom
@@ -816,6 +828,9 @@ subroutine phys_init( phys_state, phys_tend, pbuf2d, cam_out )
 
     ! Prescribed tracers
     call prescribed_ozone_init()
+    call prescribed_cloud_init(phys_state, pbuf2d)
+    call presc_sfc_flux_init()
+    call presc_radheat_init()
     call prescribed_ghg_init()
     call prescribed_aero_init()
     call aerodep_flx_init()
@@ -958,6 +973,9 @@ subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out)
 #if ( defined OFFLINE_DYN )
      use metdata,       only: get_met_srf1
 #endif
+!++BEH
+    use prescribed_radheat, only: conserve_radiant_energy, has_presc_radheat
+!--BEH
 
     !
     ! Input arguments
@@ -1029,6 +1047,10 @@ subroutine phys_run1(phys_state, ztodt, phys_tend, pbuf2d,  cam_in, cam_out)
        call t_startf('phys_timestep_init')
        call phys_timestep_init( phys_state, cam_out, pbuf2d)
        call t_stopf('phys_timestep_init')
+
+       if ( has_presc_radheat ) then
+          call conserve_radiant_energy(phys_state, pbuf2d)
+       end if
 
        call t_stopf ('physpkg_st1')
 
@@ -1224,6 +1246,9 @@ subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
     use time_manager,   only: get_nstep
     use check_energy,   only: ieflx_gmean, check_ieflx_fix 
     use phys_control,   only: ieflx_opt
+!++BEH
+    use prescribed_sfc_flux, only: presc_sfc_flux_overwrite, has_presc_sfc_flux
+!--BEH
     !
     ! Input arguments
     !
@@ -1273,6 +1298,11 @@ subroutine phys_run2(phys_state, ztodt, phys_tend, pbuf2d,  cam_out, &
     !
     call get_met_srf2( cam_in )
 #endif
+
+    if ( has_presc_sfc_flux ) then
+       call presc_sfc_flux_overwrite( cam_in, pbuf2d )
+    endif
+
     ! Set lightning production of NO
     call t_startf ('lightning_no_prod')
     call lightning_no_prod( phys_state, pbuf2d,  cam_in )
@@ -1450,6 +1480,10 @@ subroutine tphysac (ztodt,   cam_in,  &
     use nudging,            only: Nudge_Model,Nudge_ON,nudging_timestep_tend
     use phys_control,       only: use_qqflx_fixer
     use co2_cycle,          only: co2_cycle_set_ptend
+!++BEH_adjust_tend
+    use cam_history,        only: hist_fld_active, outfld
+    use physconst,          only: cpair
+!--BEH_adjust_tend
 
     implicit none
 
@@ -1494,6 +1528,11 @@ subroutine tphysac (ztodt,   cam_in,  &
     real(r8) :: tmp_cldice(pcols,pver) ! tmp space
     real(r8) :: tmp_t     (pcols,pver) ! tmp space
     real(r8) :: ftem      (pcols,pver) ! tmp space
+!++BEH_adjust_tend
+    real(r8) :: ftem1     (pcols,pver) ! temp space
+    real(r8) :: dmv       (pcols,pver) ! change in water vapor mass during physics
+    real(r8) :: rtdt                   ! 1./ztodt
+!--BEH_adjust_tend
     real(r8), pointer, dimension(:) :: static_ener_ac_2d ! Vertically integrated static energy
     real(r8), pointer, dimension(:) :: water_vap_ac_2d   ! Vertically integrated water vapor
 
@@ -1798,6 +1837,24 @@ if (l_ac_energy_chk) then
     tmp_cldliq(:ncol,:pver) = state%q(:ncol,:pver,ixcldliq)
     tmp_cldice(:ncol,:pver) = state%q(:ncol,:pver,ixcldice)
     call physics_dme_adjust(state, tend, qini, ztodt)
+!++BEH_adjust_tend
+    if (hist_fld_active('ATENDTE')) then
+       rtdt = 1._r8/ztodt
+       ! ATENDTE = sum(cpd * dmv * T + dmv * 0.5 * (u**2+v**2)) + Phi_s * sum(dmv)
+       dmv = (state%q(:ncol,:pver,1) - qini(:ncol,:pver)) * state%pdel(:ncol,:pver) * rga * rtdt
+       do k=1,pver
+          ftem1(:ncol,k)=state%phis(:ncol)  !! surface geopotential in units (m2/s2)
+       end do
+       ftem(:ncol,:pver) = (cpair*state%t(:ncol,:pver)*dmv(:ncol,:pver)) + &
+            (dmv(:ncol,:pver) * 0.5_r8 * (state%u(:ncol,:pver)**2 + state%v(:ncol,:pver)**2)) + &
+            (ftem1(:ncol,:pver) * dmv(:ncol,:pver))
+       do k=2,pver
+          ftem(:ncol,1) = ftem(:ncol,1) + ftem(:ncol,k)
+       end do
+       call outfld('ATENDTE', ftem(:ncol,1), pcols, lchnk )
+    endif
+!--BEH_adjust_tend
+
 !!!   REMOVE THIS CALL, SINCE ONLY Q IS BEING ADJUSTED. WON'T BALANCE ENERGY. TE IS SAVED BEFORE THIS
 !!!   call check_energy_chng(state, tend, "drymass", nstep, ztodt, zero, zero, zero, zero)
 
@@ -2768,6 +2825,9 @@ subroutine phys_timestep_init(phys_state, cam_out, pbuf2d)
   use perf_mod
 
   use prescribed_ozone,    only: prescribed_ozone_adv
+  use prescribed_cloud,    only: prescribed_cloud_adv
+  use prescribed_sfc_flux, only: presc_sfc_flux_adv
+  use prescribed_radheat,  only: presc_radheat_adv
   use prescribed_ghg,      only: prescribed_ghg_adv
   use prescribed_aero,     only: prescribed_aero_adv
   use aerodep_flx,         only: aerodep_flx_adv
@@ -2799,6 +2859,9 @@ subroutine phys_timestep_init(phys_state, cam_out, pbuf2d)
 
   ! Prescribed tracers
   call prescribed_ozone_adv(phys_state, pbuf2d)
+  call prescribed_cloud_adv(phys_state, pbuf2d)
+  call presc_sfc_flux_adv(phys_state, pbuf2d)
+  call presc_radheat_adv(phys_state, pbuf2d)
   call prescribed_ghg_adv(phys_state, pbuf2d)
   call prescribed_aero_adv(phys_state, pbuf2d)
   call aircraft_emit_adv(phys_state, pbuf2d)

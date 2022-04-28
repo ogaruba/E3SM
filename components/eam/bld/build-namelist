@@ -3732,6 +3732,13 @@ add_default($nl, 'export_gustiness');
 # Use Convective water in radiation
 add_default($nl, 'conv_water_in_rad');
 
+# Remove clouds from atm radiative heating
+add_default($nl, 'no_cloud_lw_radheat_atm', 'val'=>'.false.');
+add_default($nl, 'no_cloud_sw_radheat_atm', 'val'=>'.false.');
+# Remove clouds from sfc radiative heating
+add_default($nl, 'no_cloud_lw_radheat_sfc', 'val'=>'.false.');
+add_default($nl, 'no_cloud_sw_radheat_sfc', 'val'=>'.false.');
+
 # Cloud fraction
 add_default($nl, 'cldfrc_freeze_dry');
 add_default($nl, 'cldfrc_ice');
