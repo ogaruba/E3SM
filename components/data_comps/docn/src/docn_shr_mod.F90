@@ -153,6 +153,7 @@ CONTAINS
         trim(datamode) == 'COPYALL'             .or. &
         trim(datamode) == 'IAF'                 .or. &
         trim(datamode) == 'SOM'                 .or. &
+        trim(datamode) == 'SOM_MPAS'            .or. &
         trim(datamode) == 'SOM_AQUAP') then
        if (my_task == master_task) then
           write(logunit,F00) ' docn datamode = ',trim(datamode)
@@ -181,7 +182,7 @@ CONTAINS
        ocn_prognostic = .true.
        ocnrof_prognostic = .true.
     endif
-    if (trim(datamode) == 'SOM' .or. trim(datamode) == 'SOM_AQUAP') then
+    if (trim(datamode) == 'SOM' .or. trim(datamode) == 'SOM_MPAS' .or. trim(datamode) == 'SOM_AQUAP') then
        ocn_prognostic = .true.
     endif
 

@@ -346,6 +346,20 @@
   <lname>20TR_EAM_ELM%CNECACTCBC_CICE_DOCN%SOM_MOSART_SGLC_SWAV</lname>
 </compset>
 
+<compset>
+  <alias>E1850C5ELMCNMC</alias>
+  <lname>1850_EAM_ELM%CN_MPASSI_DOCN%SOMMPAS_MOSART_SGLC_SWAV</lname>
+</compset>
+
+<compset>
+  <alias>E_WCYCL1850</alias>
+  <lname>1850SOI_EAM%CMIP6_ELM%SPBC_MPASSI_DOCN%SOMMPAS_MOSART_SGLC_SWAV</lname>
+</compset>
+
+<compset>
+  <alias>E_WCYCL1950</alias>
+  <lname>1950SOI_EAM%CMIP6_ELM%SPBC_MPASSI_DOCN%SOMMPAS_MOSART_SGLC_SWAV</lname>
+</compset>
 <entries>
 
   <entry id="RUN_STARTDATE">

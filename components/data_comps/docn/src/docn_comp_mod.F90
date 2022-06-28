@@ -256,7 +256,7 @@ CONTAINS
     klwdn  = mct_aVect_indexRA(x2o,'Faxa_lwdn')
     ksnow  = mct_aVect_indexRA(x2o,'Faxa_snow')
     kmelth = mct_aVect_indexRA(x2o,'Fioi_melth')
-
+    
     call mct_aVect_init(avstrm, rList=flds_strm, lsize=lsize)
     call mct_aVect_zero(avstrm)
 
@@ -332,7 +332,7 @@ CONTAINS
        call shr_mpi_bcast(exists,mpicom,'exists')
        call shr_mpi_bcast(exists1,mpicom,'exists1')
 
-       if (trim(datamode) == 'SOM' .or. trim(datamode) == 'SOM_AQUAP') then
+       if (trim(datamode) == 'SOM' .or. trim(datamode) == 'SOM_MPAS' .or. trim(datamode) == 'SOM_AQUAP') then
        if (exists1) then
           if (my_task == master_task) write(logunit,F00) ' reading ',trim(rest_file)
           call shr_pcdf_readwrite('read',SDOCN%pio_subsystem, SDOCN%io_type, &
@@ -608,6 +608,45 @@ CONTAINS
           enddo
        endif   ! firstcall
 
+    case('SOM_MPAS')
+       lsize = mct_avect_lsize(o2x)
+       do n = 1,SDOCN%nstreams
+          call shr_dmodel_translateAV(SDOCN%avs(n),avstrm,avifld,avofld,rearr)
+       enddo
+       if (firstcall) then
+          do n = 1,lsize
+             if (.not. read_restart) then
+                somtp(n) = o2x%rAttr(kt,n) + TkFrz
+             endif
+             o2x%rAttr(kt,n) = somtp(n)
+             o2x%rAttr(kq,n) = 0.0_R8
+          enddo
+       else   ! firstcall
+          tfreeze = shr_frz_freezetemp(o2x%rAttr(ks,:)) + TkFrz
+          do n = 1,lsize
+             if (imask(n) /= 0) then
+                !--- pull out h from av for resuse below ---
+                hn = avstrm%rAttr(kh,n)  
+                     
+                !--- compute new temp ---
+                o2x%rAttr(kt,n) = somtp(n) + &
+                     ((max(x2o%rAttr(kswnet, n), 0.0_R8) + &  ! shortwave
+                     x2o%rAttr(klwup ,n) + &  ! longwave
+                     x2o%rAttr(klwdn ,n) + &  ! longwave
+                     x2o%rAttr(ksen  ,n) + &  ! sensible
+                     x2o%rAttr(klat  ,n) + &  ! latent
+                     x2o%rAttr(kmelth,n) - &  ! ice melt                 
+                     avstrm%rAttr(kqbot ,n) - &  ! flux at bottom
+                     (x2o%rAttr(ksnow,n)+x2o%rAttr(krofi,n))*latice) * &  ! latent by prec and roff
+                     dt/(cpsw*rhosw*hn)) 
+                !--- compute ice formed or melt potential ---
+                o2x%rAttr(kq,n) = (tfreeze(n) - o2x%rAttr(kt,n))*(cpsw*rhosw*hn)/dt  ! ice formed q>0
+                o2x%rAttr(kt,n) = max(tfreeze(n),o2x%rAttr(kt,n))                    ! reset temp
+                somtp(n) = o2x%rAttr(kt,n)                                        ! save temp
+             endif
+          enddo
+       endif   ! firstcall
+
     case('SOM_AQUAP')
        lsize = mct_avect_lsize(o2x)
        do n = 1,SDOCN%nstreams
@@ -635,8 +674,10 @@ CONTAINS
                   x2o%rAttr(klat  ,n) + &  ! latent
                   x2o%rAttr(kmelth,n) - &  ! ice melt
                   avstrm%rAttr(kqbot ,n) - &  ! flux at bottom
-                  (x2o%rAttr(ksnow,n)+x2o%rAttr(krofi,n))*latice) * &  ! latent by prec and roff
-                  dt/(cpsw*rhosw*hn)
+                  (x2o%rAttr(ksnow,n)+x2o%rAttr(krofi,n))*latice) &! latent by prec and roff
+                  *dt/(cpsw*rhosw*hn) 
+                    
+                  
              !--- compute ice formed or melt potential ---
              o2x%rAttr(kq,n) = (tfreeze(n) - o2x%rAttr(kt,n))*(cpsw*rhosw*hn)/dt  ! ice formed q>0
              somtp(n) = o2x%rAttr(kt,n)                                        ! save temp
@@ -692,7 +733,7 @@ CONTAINS
           close(nu)
           call shr_file_freeUnit(nu)
        endif
-       if (trim(datamode) == 'SOM' .or. trim(datamode) == 'SOM_AQUAP') then
+       if (trim(datamode) == 'SOM' .or. trim(datamode) == 'SOM_MPAS' .or. trim(datamode) == 'SOM_AQUAP') then
           if (my_task == master_task) write(logunit,F04) ' writing ',trim(rest_file),target_ymd,target_tod
           call shr_pcdf_readwrite('write', SDOCN%pio_subsystem, SDOCN%io_type,&
                trim(rest_file), mpicom, gsmap, clobber=.true., rf1=somtp,rf1n='somtp')
