@@ -22,16 +22,6 @@
   </compset>
 
   <compset>
-    <alias>F1850S-AR5-superfast</alias>
-    <lname>1850S_EAM%AR5sf_ELM%SPBC_CICE%PRES_DOCN%DOM_SROF_SGLC_SWAV</lname>
-  </compset>
-
-  <compset>
-    <alias>F20TRS-AR5-superfast</alias>
-    <lname>20TRS_EAM%AR5sf_ELM%SPBC_CICE%PRES_DOCN%DOM_SROF_SGLC_SWAV</lname>
-  </compset>
-
-  <compset>
     <alias>F1950-CICE</alias>
     <lname>1950_EAM%CMIP6_ELM%SPBC_CICE%PRES_DOCN%DOM_SROF_SGLC_SWAV</lname>
   </compset>
@@ -61,6 +51,17 @@
     <lname>2010_EAM%CMIP6_ELM%SPBC_MPASSI%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
   </compset>
 
+  <compset>
+    <alias>FSSP370</alias>
+    <lname>SSP370_eam_EAM%CMIP6_ELM%SPBC_MPASSI%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>FSSP585</alias>
+    <lname>SSP585_eam_EAM%CMIP6_ELM%SPBC_MPASSI%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
+
   <!-- *********************************** -->
   <!-- Single column model -->
   <!-- *********************************** -->
@@ -81,8 +82,23 @@
   </compset>
 
   <compset>
+    <alias>FSCM-ARM97-MMF2</alias>
+    <lname>ARM97_EAM%SCM-MMF2_ELM%SP_CICE%PRES_DOCN%DOM_SROF_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>FSCM-ARM97-MMF2-AWFL</alias>
+    <lname>ARM97_EAM%SCM-MMF2-AWFL_ELM%SP_CICE%PRES_DOCN%DOM_SROF_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
     <alias>FSCM-RICO-MMF1</alias>
     <lname>RICO_EAM%SCM-MMF1_ELM%SP_CICE%PRES_DOCN%DOM_SROF_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>FSCM-RICO-MMF2</alias>
+    <lname>RICO_EAM%SCM-MMF2_ELM%SP_CICE%PRES_DOCN%DOM_SROF_SGLC_SWAV</lname>
   </compset>
 
   <!-- ************************************************* -->
@@ -114,6 +130,82 @@
     <lname>2000_EAM%AQP-MMF1_SLND_SICE_DOCN%AQP1_SROF_SGLC_SWAV</lname>
   </compset>
 
+  <compset>
+    <alias>FAQP-MMF2</alias>
+    <lname>2000_EAM%AQP-MMF2_SLND_SICE_DOCN%AQP1_SROF_SGLC_SWAV</lname>
+  </compset>
+  
+  <!-- *********************************** -->
+  <!-- SCREAM compsets -->
+  <!-- *********************************** -->  
+  
+  <!-- SCREAM aquaplanet -->
+  <compset>
+    <alias>F-SCREAM-LR-AQP1</alias>
+    <lname>2000_EAM%SCREAM-LR-AQUA_SLND_SICE_DOCN%AQP1_SROF_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>F-SCREAM-HR-AQP1</alias>
+    <lname>2000_EAM%SCREAM-HR-AQUA_SLND_SICE_DOCN%AQP1_SROF_SGLC_SWAV</lname>
+  </compset>
+
+  <!-- SCREAM compsets with CMIP6 2010 forcings -->
+  <compset>
+    <alias>F2010-SCREAM-LR</alias>
+    <lname>2010_EAM%SCREAM-LR_ELM45%SPBC_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset> 
+  
+  <compset>
+    <alias>F2010-SCREAM-HR</alias>
+    <lname>2010_EAM%SCREAM-HR_ELM45%SPBC_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset> 
+
+  <compset>
+    <alias>F2010-SCREAM-LR-DYAMOND1</alias>
+    <lname>2010_EAM%SCREAM-LR-DYAMOND1_ELM45%SPBC_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>F2010-SCREAM-HR-DYAMOND1</alias>
+    <lname>2010_EAM%SCREAM-HR-DYAMOND1_ELM45%SPBC_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>F2010-SCREAM-LR-DYAMOND1-MPASSI</alias>
+    <lname>2010_EAM%SCREAM-LR-DYAMOND1_ELM45%SPBC_MPASSI%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>F2010-SCREAM-HR-DYAMOND1-MPASSI</alias>
+    <lname>2010_EAM%SCREAM-HR-DYAMOND1_ELM45%SPBC_MPASSI%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
+   <compset>
+    <alias>F2010-SCREAM-LR-DYAMOND2</alias>
+    <lname>2010_EAM%SCREAM-LR-DYAMOND2_ELM45%SPBC_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>F2010-SCREAM-HR-DYAMOND2</alias>
+    <lname>2010_EAM%SCREAM-HR-DYAMOND2_ELM45%SPBC_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+  
+  <compset>
+    <alias>F2010-SCREAM-LR-DYAMOND2-MPASSI</alias>
+    <lname>2010_EAM%SCREAM-LR-DYAMOND2_ELM45%SPBC_MPASSI%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>F2010-SCREAM-HR-DYAMOND2-MPASSI</alias>
+    <lname>2010_EAM%SCREAM-HR-DYAMOND2_ELM45%SPBC_MPASSI%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>FDPSCREAM-ARM97</alias>
+      <lname>ARM97_EAM%DPSCREAM_ELM%SP_CICE%PRES_DOCN%DOM_SROF_SGLC_SWAV</lname>
+  </compset>
+
   <!-- *********************************** -->
   <!-- Radiative-Convective Equilibrium (RCE) -->
   <!-- *********************************** -->
@@ -127,9 +219,19 @@
     <lname>2000_EAM%RCE-MMF1_SLND_SICE_DOCN%AQPCONST_SROF_SGLC_SWAV</lname>
   </compset>
 
+  <compset>
+    <alias>FRCE-MMF2</alias>
+    <lname>2000_EAM%RCE-MMF2_SLND_SICE_DOCN%AQPCONST_SROF_SGLC_SWAV</lname>
+  </compset>
+
   <!-- *********************************** -->
   <!-- idealized / adiabatic -->
   <!-- *********************************** -->
+  
+  <compset>
+    <alias>FSCRAV1C-L</alias>
+    <lname>2000_SCREAM%AV1C-L_ELM45%SPBC_CICE%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>  
 
   <compset>
     <alias>FIDEAL</alias>
@@ -152,10 +254,25 @@
     <lname>2010_EAM%MMF1_ELM%SP_CICE%PRES_DOCN%DOM_SROF_SGLC_SWAV</lname>
   </compset>
 
+  <compset>
+    <alias>F2010-MMF2</alias>
+    <lname>2010_EAM%MMF2_ELM%SP_CICE%PRES_DOCN%DOM_SROF_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>F2010-MMF2-AWFL</alias>
+    <lname>2010_EAM%MMF2-AWFL_ELM%SP_CICE%PRES_DOCN%DOM_SROF_SGLC_SWAV</lname>
+  </compset>
+
   <!-- F compsets with transient SST (AMIP) -->
   <compset>
     <alias>F20TR-MMF1</alias>
     <lname>20TR_EAM%CMIP6-MMF1_ELM%SP_MPASSI%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
+  </compset>
+
+  <compset>
+    <alias>F20TR-MMF1</alias>
+    <lname>20TR_EAM%CMIP6-MMF2_ELM%SP_MPASSI%PRES_DOCN%DOM_MOSART_SGLC_SWAV</lname>
   </compset>
 
   <!-- ******************************* -->
@@ -176,6 +293,10 @@
         <value  compset="ARM95_EAM">1995-07-18</value>
         <value  compset="ARM97_EAM">1997-06-19</value>
         <value  compset="RICO_EAM">2004-12-16</value>
+        <value  compset="_EAM%SCREAM-LR-DYAMOND1">2016-08-01</value>
+        <value  compset="_EAM%SCREAM-HR-DYAMOND1">2016-08-01</value>
+        <value  compset="_EAM%SCREAM-LR-DYAMOND2">2020-01-20</value>
+        <value  compset="_EAM%SCREAM-HR-DYAMOND2">2020-01-20</value>
       </values>
     </entry>
 
@@ -242,6 +363,81 @@
       </values>
     </entry>
 
+    <entry id="PTS_NX">
+      <values>
+        <value compset="EAM%DPSCREAM">225</value>
+      </values>
+    </entry>
+
+    <entry id="PTS_NY">
+      <values>
+        <value compset="EAM%DPSCREAM">1</value>
+      </values>
+    </entry>
+
+    <entry id="PTS_MULTCOLS_MODE">
+      <values>
+        <value compset="EAM%DPSCREAM">TRUE</value>
+      </values>
+    </entry>
+
+    <entry id="PTS_MODE">
+      <values>
+        <value compset="EAM%DPSCREAM">TRUE</value>
+      </values>
+    </entry>
+
+    <entry id="ATM_NCPL">
+      <values>
+        <value compset="EAM%DPSCREAM">720</value>
+      </values>
+    </entry>
+
+    <entry id="SSTICE_DATA_FILENAME">
+      <values>
+        <value compset="_EAM%SCREAM-HR-DYAMOND1">$DIN_LOC_ROOT/atm/cam/sst/sst_ifs_2560x5136_20160725_20160916_c201013.nc</value>
+        <value compset="_EAM%SCREAM-LR-DYAMOND1">$DIN_LOC_ROOT/atm/cam/sst/sst_ifs_2560x5136_20160725_20160916_c201013.nc</value>
+        <value compset="_EAM%SCREAM-HR-DYAMOND2">$DIN_LOC_ROOT/atm/cam/sst/sst_ifs_360x720_20200110_20200305_c201013.nc</value>
+        <value compset="_EAM%SCREAM-LR-DYAMOND2">$DIN_LOC_ROOT/atm/cam/sst/sst_ifs_360x720_20200110_20200305_c201013.nc</value>
+      </values>
+    </entry> 
+
+    <entry id="SSTICE_GRID_FILENAME">
+      <values>
+        <value compset="_EAM%SCREAM-HR-DYAMOND1">$DIN_LOC_ROOT/ocn/docn7/domain.ocn.2560x5136.201027.nc</value>
+        <value compset="_EAM%SCREAM-LR-DYAMOND1">$DIN_LOC_ROOT/ocn/docn7/domain.ocn.2560x5136.201027.nc</value>
+        <value compset="_EAM%SCREAM-HR-DYAMOND2">$DIN_LOC_ROOT/ocn/docn7/domain.ocn.360x720.201027.nc</value>
+        <value compset="_EAM%SCREAM-LR-DYAMOND2">$DIN_LOC_ROOT/ocn/docn7/domain.ocn.360x720.201027.nc</value>
+      </values>
+    </entry> 
+
+    <entry id="SSTICE_YEAR_ALIGN">
+      <values>
+        <value compset="_EAM%SCREAM-HR-DYAMOND1">2016</value>
+        <value compset="_EAM%SCREAM-HR-DYAMOND1">2016</value>
+        <value compset="_EAM%SCREAM-HR-DYAMOND2">2020</value>
+        <value compset="_EAM%SCREAM-HR-DYAMOND2">2020</value>
+      </values>
+    </entry> 
+
+    <entry id="SSTICE_YEAR_START">
+      <values>
+        <value compset="_EAM%SCREAM-HR-DYAMOND1">2016</value>
+        <value compset="_EAM%SCREAM-LR-DYAMOND1">2016</value>
+        <value compset="_EAM%SCREAM-HR-DYAMOND2">2020</value>
+        <value compset="_EAM%SCREAM-LR-DYAMOND2">2020</value>
+      </values>
+    </entry> 
+
+    <entry id="SSTICE_YEAR_END">
+      <values>
+        <value compset="_EAM%SCREAM-HR-DYAMOND1">2016</value>
+        <value compset="_EAM%SCREAM-LR-DYAMOND1">2016</value>
+        <value compset="_EAM%SCREAM-HR-DYAMOND2">2020</value>
+        <value compset="_EAM%SCREAM-LR-DYAMOND2">2020</value>
+      </values>
+    </entry>
+    
   </entries>
 
 </compsets>

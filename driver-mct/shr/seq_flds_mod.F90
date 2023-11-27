@@ -129,6 +129,7 @@ module seq_flds_mod
   use shr_fire_emis_mod , only : shr_fire_emis_readnl, shr_fire_emis_mechcomps_n, shr_fire_emis_ztop_token
   use shr_carma_mod     , only : shr_carma_readnl
   use shr_ndep_mod      , only : shr_ndep_readnl
+  use shr_dust_mod      , only : shr_dust_readnl
   use shr_flds_mod      , only : seq_flds_dom_coord=>shr_flds_dom_coord, seq_flds_dom_other=>shr_flds_dom_other
 
   implicit none
@@ -157,6 +158,7 @@ module seq_flds_mod
   logical            :: rof2ocn_nutrients   ! .true. if the runoff model passes nutrient fields to the ocn
   logical            :: lnd_rof_two_way     ! .true. if land-river two-way coupling turned on
   logical            :: ocn_rof_two_way     ! .true. if river-ocean two-way coupling turned on
+  logical            :: rof_sed             ! .true. if river model includes sediment
 
   !----------------------------------------------------------------------------
   ! metadata
@@ -381,7 +383,7 @@ contains
          flds_co2a, flds_co2b, flds_co2c, flds_co2_dmsa, flds_wiso, glc_nec, &
          ice_ncat, seq_flds_i2o_per_cat, flds_bgc_oi, &
          nan_check_component_fields, rof_heat, atm_flux_method, atm_gustiness, &
-         rof2ocn_nutrients, lnd_rof_two_way, ocn_rof_two_way
+         rof2ocn_nutrients, lnd_rof_two_way, ocn_rof_two_way, rof_sed
 
     ! user specified new fields
     integer,  parameter :: nfldmax = 200
@@ -422,6 +424,7 @@ contains
        rof2ocn_nutrients = .false.
        lnd_rof_two_way   = .false.
        ocn_rof_two_way   = .false.
+       rof_sed   = .false.
 
        unitn = shr_file_getUnit()
        write(logunit,"(A)") subname//': read seq_cplflds_inparm namelist from: '&
@@ -454,6 +457,7 @@ contains
     call shr_mpi_bcast(rof2ocn_nutrients, mpicom)
     call shr_mpi_bcast(lnd_rof_two_way,   mpicom)
     call shr_mpi_bcast(ocn_rof_two_way,   mpicom)
+    call shr_mpi_bcast(rof_sed,   mpicom)
 
     call glc_elevclass_init(glc_nec)
 
@@ -1274,8 +1278,19 @@ contains
     call seq_flds_add(x2a_states,"Sx_u10")
     longname = '10m wind'
     stdname  = '10m_wind'
-    units    = 'm'
+    units    = 'm s-1'
     attname  = 'u10'
+    call metadata_set(attname, longname, stdname, units)
+
+    ! 10 meter wind with gustiness
+    call seq_flds_add(i2x_states,"Si_u10withgusts")
+    call seq_flds_add(xao_states,"So_u10withgusts")
+    call seq_flds_add(l2x_states,"Sl_u10withgusts")
+    call seq_flds_add(x2a_states,"Sx_u10withgusts")
+    longname = '10m wind with gustiness'
+    stdname  = ''
+    units    = 'm s-1'
+    attname  = 'u10withgusts'
     call metadata_set(attname, longname, stdname, units)
 
     ! Zonal surface stress"
@@ -2184,8 +2199,21 @@ contains
        units    = ' '
        attname  = 'coszen_str'
        call metadata_set(attname, longname, stdname, units)
+       
+	   if (rof_sed) then
+          call seq_flds_add(l2x_fluxes,'Flrl_rofmud')
+          call seq_flds_add(l2x_fluxes_to_rof,'Flrl_rofmud')
+          call seq_flds_add(x2r_fluxes,'Flrl_rofmud')
+          longname = 'Sediment flux from land (mud)'
+          stdname  = 'mud_flux_into_runoff_surface'
+          units    = 'kg m-2 s-1'
+          attname  = 'Flrl_rofmud'
+          call metadata_set(attname, longname, stdname, units)
+	   end if
+
     endif
 
+	
     !-----------------------------
     ! rof->ocn (runoff) and rof->lnd (flooding)
     !-----------------------------
@@ -3798,6 +3826,11 @@ contains
 
        call metadata_set(ndep_fields, longname, stdname, units)
     end if
+
+    !----------------------------------------------------------------------------
+    ! Dust-related info
+    !----------------------------------------------------------------------------
+    call shr_dust_readnl(nlfilename='drv_in', ID=ID)
 
     !----------------------------------------------------------------------------
     ! state + flux fields

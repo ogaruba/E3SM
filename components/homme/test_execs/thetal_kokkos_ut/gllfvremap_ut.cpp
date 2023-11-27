@@ -171,7 +171,6 @@ struct Session {
     printf("seed %u\n", seed);
 
     parse_command_line();
-    assert(is_sphere); // planar isn't available in Hxx yet
 
     auto& c = Context::singleton();
 
@@ -186,7 +185,8 @@ struct Session {
     p.transport_alg = 0;
     p.moisture = MoistDry::MOIST;
     p.theta_hydrostatic_mode = false;
-    p.rearth = PhysicalConstants::rearth0;
+    p.scale_factor = is_sphere ? PhysicalConstants::rearth0 : 1;
+    p.laplacian_rigid_factor = is_sphere ? 1/p.scale_factor : 0;
     p.params_set = true;
 
     const auto hyai = cmvdc(h.hybrid_ai);
@@ -249,7 +249,7 @@ struct Session {
 private:
   static std::shared_ptr<Session> s_session;
 
-  // gllfvremap_ut hommexx -ne NE -qsize QSIZE
+  // gllfvremap_ut hommexx -ne NE -qsize QSIZE [-planar]
   void parse_command_line () {
     const bool am_root = get_comm().root();
     ne = 2;
@@ -270,6 +270,7 @@ private:
       }
     }
     ne = std::max(2, std::min(128, ne));
+    if ( ! is_sphere) ne = std::max(4, ne);
     qsize = std::max(1, std::min(QSIZE_D, qsize));
     if ( ! ok && am_root)
       printf("gllfvremap_ut> Failed to parse command line, starting with: %s\n",
@@ -281,7 +282,8 @@ private:
 #else
         0;
 #endif
-      printf("gllfvremap_ut> bfb %d ne %d qsize %d\n", bfb, ne, qsize);
+      printf("gllfvremap_ut> bfb %d ne %d qsize %d sphere %d\n",
+             bfb, ne, qsize, int(is_sphere));
     }
   }
 };

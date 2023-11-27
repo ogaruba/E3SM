@@ -3,8 +3,8 @@ module thetal_test_interface
   use iso_c_binding,  only: c_int, c_bool, c_double, c_ptr, c_f_pointer
   use derivative_mod, only: derivative_t
   use element_mod,    only: element_t
-  use kinds,          only: real_kind 
-  use hybvcoord_mod,  only: hvcoord_t 
+  use kinds,          only: real_kind
+  use hybvcoord_mod,  only: hvcoord_t
   use parallel_mod,   only: abortmp
   use geometry_mod,   only: set_area_correction_map0
 
@@ -16,6 +16,7 @@ module thetal_test_interface
   public :: init_f90
   public :: cleanup_f90
   public :: init_geo_views_f90
+  public :: initialize_reference_states_f90
 
 contains
 
@@ -26,10 +27,6 @@ contains
     use dimensions_mod,         only: nelemd, nlev, nlevp, np
     use geometry_interface_mod, only: initmp_f90, init_cube_geometry_f90, init_connectivity_f90
     use geometry_interface_mod, only: par, elem
-    use hybvcoord_mod,          only: set_layer_locations
-    use element_state,          only: allocate_element_arrays, setup_element_pointers_ie, &
-                                      nlev_tom, nu_scale_top
-    use mass_matrix_mod,        only: mass_matrix
     use quadrature_mod,         only: gausslobatto, quadrature_t
     use physical_constants,     only: scale_factor, scale_factor_inv, laplacian_rigid_factor, rearth, rrearth
     !
@@ -42,13 +39,13 @@ contains
     !
     ! Locals
     !
-    integer :: ie, k
+    integer :: ie
     type (quadrature_t) :: gp
 
     scale_factor = rearth
     scale_factor_inv = rrearth
     laplacian_rigid_factor = rrearth
-    
+
     call derivinit(deriv)
 
     call initmp_f90()
@@ -63,6 +60,88 @@ contains
     do ie=1,nelemd
       call cube_init_atomic(elem(ie),gp%points)
     enddo
+
+    call init_common(hyai, hybi, hyam, hybm, dvv, mp, ps0)   
+  end subroutine init_f90
+
+  subroutine init_planar_f90 (ne_x_in, ne_y_in, hyai, hybi, hyam, hybm, dvv, mp, ps0) bind(c)
+    ! Alternative to init_f90 to create a planar model.
+    use control_mod,            only: cubed_sphere_map, geometry, topology
+    use planar_mod,             only: plane_init_atomic, plane_set_corner_coordinates
+    use derivative_mod,         only: derivinit
+    use dimensions_mod,         only: nelemd, nlev, nlevp, np, ne_x, ne_y
+    use geometry_interface_mod, only: initmp_f90, init_cube_geometry_f90, init_connectivity_f90, &
+                                      par, elem
+    use quadrature_mod,         only: gausslobatto, quadrature_t
+    use physical_constants,     only: scale_factor, scale_factor_inv, laplacian_rigid_factor, &
+                                      Sx, Sy, Lx, Ly, dx, dy, dx_ref, dy_ref, domain_size
+    !
+    ! Inputs
+    !
+    integer (kind=c_int), intent(in) :: ne_x_in, ne_y_in
+    real (kind=real_kind), intent(in) :: hyai(nlevp), hybi(nlevp), hyam(nlev), hybm(nlev)
+    real (kind=real_kind), intent(in) :: ps0
+    real (kind=real_kind), intent(out) :: dvv(np,np), mp(np,np)
+    !
+    ! Locals
+    !
+    integer :: ie
+    type (quadrature_t) :: gp
+
+    ne_x = ne_x_in
+    ne_y = ne_y_in
+
+    scale_factor = 1
+    scale_factor_inv = 1
+    laplacian_rigid_factor = 0
+    topology = 'plane'
+    geometry = 'plane'
+    Lx = 10000
+    Ly = 5000
+    Sx = -5000
+    Sy = 2500
+
+    domain_size = Lx * Ly
+    dx = Lx/ne_x
+    dy = Ly/ne_y
+    dx_ref = 1.0D0/ne_x
+    dy_ref = 1.0D0/ne_y
+
+    call derivinit(deriv)
+
+    call initmp_f90()
+    call init_cube_geometry_f90(ne_x) ! ne_x is unused
+    call init_connectivity_f90()
+
+    cubed_sphere_map = 2
+    gp=gausslobatto(np)  ! GLL points
+    do ie=1,nelemd
+      call plane_set_corner_coordinates(elem(ie))
+    end do
+    do ie=1,nelemd
+      call plane_init_atomic(elem(ie),gp%points)
+    enddo
+
+    call init_common(hyai, hybi, hyam, hybm, dvv, mp, ps0)
+  end subroutine init_planar_f90
+
+  subroutine init_common(hyai, hybi, hyam, hybm, dvv, mp, ps0)
+    use element_state,          only: allocate_element_arrays, setup_element_pointers_ie
+    use mass_matrix_mod,        only: mass_matrix
+    use hybvcoord_mod,          only: set_layer_locations
+    use dimensions_mod,         only: nelemd, nlev, nlevp, np
+    use geometry_interface_mod, only: par, elem
+    !
+    ! Inputs
+    !
+    real (kind=real_kind), intent(in) :: hyai(nlevp), hybi(nlevp), hyam(nlev), hybm(nlev)
+    real (kind=real_kind), intent(in) :: ps0
+    real (kind=real_kind), intent(out) :: dvv(np,np), mp(np,np)
+    !
+    ! Locals
+    !
+    integer :: ie, k
+    
     call allocate_element_arrays(nelemd)
 
     call mass_matrix(par,elem)
@@ -88,8 +167,7 @@ contains
     call set_layer_locations (hvcoord,.false.,.false.)
 
     deriv%dvv = dvv
-
-  end subroutine init_f90
+  end subroutine init_common
 
   subroutine init_geo_views_f90 (d_ptr, dinv_ptr,        &
                        phis_ptr, gradphis_ptr, fcor_ptr, &
@@ -114,8 +192,8 @@ contains
     call c_f_pointer(d_ptr,    tensor2d, [np,np,2,2,nelemd])
     call c_f_pointer(mdet_ptr, scalar2d, [np,np,    nelemd])
     do ie=1,nelemd
-      tensor2d(:,:,:,:,ie) = elem(ie)%d      
-      scalar2d(:,:,ie)     = elem(ie)%metdet 
+      tensor2d(:,:,:,:,ie) = elem(ie)%d
+      scalar2d(:,:,ie)     = elem(ie)%metdet
     enddo
 
     call c_f_pointer(dinv_ptr, tensor2d, [np,np,2,2,nelemd])
@@ -173,5 +251,40 @@ contains
     call deallocate_element_arrays()
 
   end subroutine cleanup_f90
+
+
+  subroutine initialize_reference_states_f90(phis_ptr, dp_ref_ptr, theta_ref_ptr, phi_ref_ptr) bind(c)
+    use element_ops,    only: initialize_reference_states
+    use dimensions_mod, only: nelemd, nlev, nlevp, np
+    use theta_f2c_mod,  only : init_reference_states_c
+    !
+    ! Inputs
+    !
+    type (c_ptr), intent(in) :: phis_ptr, dp_ref_ptr, theta_ref_ptr, phi_ref_ptr
+    !
+    ! Locals
+    !
+    real (kind=real_kind), dimension(:,:,:),  pointer :: phis
+    real (kind=real_kind), dimension(:,:,:,:),  pointer :: dp_ref, theta_ref, phi_ref
+    integer :: ie
+
+    call c_f_pointer(phis_ptr,      phis,      [np,np,      nelemd])
+    call c_f_pointer(dp_ref_ptr,    dp_ref,    [np,np,nlev, nelemd])
+    call c_f_pointer(theta_ref_ptr, theta_ref, [np,np,nlev, nelemd])
+    call c_f_pointer(phi_ref_ptr,   phi_ref,   [np,np,nlevp,nelemd])
+
+    ! Compute reference states
+    do ie=1,nelemd
+      call initialize_reference_states(hvcoord,             &
+                                       phis(:,:,ie),        &
+                                       dp_ref(:,:,:,ie),    &
+                                       theta_ref(:,:,:,ie), &
+                                       phi_ref(:,:,:,ie))
+    end do
+
+    ! Initialize reference states in C++
+    call init_reference_states_c(dp_ref_ptr,theta_ref_ptr,phi_ref_ptr)
+
+  end subroutine initialize_reference_states_f90
 
 end module thetal_test_interface

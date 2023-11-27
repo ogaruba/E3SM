@@ -42,8 +42,10 @@ contains
 
 
   subroutine init_cube_geometry_f90 (ne_in) bind(c)
-    use iso_c_binding,   only : c_int
+    use iso_c_binding,   only: c_int
+    use control_mod,     only: topology
     use cube_mod,        only: CubeTopology, CubeElemCount, CubeEdgeCount
+    use planar_mod,      only: PlaneTopology, PlaneElemCount, PlaneEdgeCount
     use dimensions_mod,  only: nelem, nelemd, npart, np
     use dimensions_mod,  only: ne
     use gridgraph_mod,   only: allocate_gridvertex_nbrs
@@ -56,10 +58,18 @@ contains
     ! Locals
     !
     integer :: ie, num_edges
+    logical :: is_cube
+
+    is_cube = trim(topology) == 'cube'
 
     ne = ne_in
-    nelem = CubeElemCount()
-    num_edges = CubeEdgeCount()
+    if (is_cube) then
+       nelem = CubeElemCount()
+       num_edges = CubeEdgeCount()
+    else
+       nelem = PlaneElemCount()
+       num_edges = PlaneEdgeCount()
+    end if
 
     if (nelem < par%nprocs) then
        call abortmp('Error: too many MPI tasks. Run the test with less MPI ranks, or increase ne.')
@@ -74,7 +84,11 @@ contains
     enddo
 
     ! Generate mesh connectivity
-    call CubeTopology(GridEdge, GridVertex)
+    if (is_cube) then
+       call CubeTopology(GridEdge, GridVertex)
+    else
+       call PlaneTopology(GridEdge,GridVertex)
+    end if
 
     ! Set number of partitions before partitioning mesh
     npart = par%nprocs
@@ -137,12 +151,12 @@ contains
     use gridgraph_mod,  only : GridEdge_t
     use dimensions_mod, only : nelem
     interface
-      subroutine init_connectivity (num_local_elems) bind (c)
+      subroutine init_connectivity (num_local_elems, max_corner_elems) bind (c)
         use iso_c_binding, only : c_int
         !
         ! Inputs
         !
-        integer (kind=c_int), intent(in) :: num_local_elems
+        integer (kind=c_int), intent(in) :: num_local_elems, max_corner_elems
       end subroutine init_connectivity
       subroutine finalize_connectivity () bind(c)
       end subroutine finalize_connectivity
@@ -166,10 +180,11 @@ contains
     !
     ! Locals
     !
-    integer :: ie, num_edges, ierr
+    integer :: ie, num_edges, ierr, max_corner_elems
     type(GridEdge_t) :: e
 
-    call init_connectivity(nelemd)
+    max_corner_elems = 1 ! always structured cubed-sphere in unit tests
+    call init_connectivity(nelemd, max_corner_elems)
 
     num_edges = SIZE(GridEdge)
     do ie=1,num_edges

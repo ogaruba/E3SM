@@ -122,9 +122,10 @@ OPTIONS
 			  trop_mam7 | trop_mam9 | super_fast_llnl | super_fast_llnl_mam3 |
                           linoz_mam3 | linoz_mam4_resus | linoz_mam4_resus_soag |
 			  linoz_mam4_resus_mom | linoz_mam4_resus_mom_soag |
-                          trop_strat_soa | trop_strat_mam3 | trop_strat_mam7 | superfast_mam4_resus_mom_soag |
+                          trop_strat_soa | trop_strat_mam3 | trop_strat_mam7 | superfast_mam4_resus_mom_soag | chemuci_linozv3_mam5_vbs |
 			  none ].  Default: trop_mam3.
      -clubb_sgs         Turns on CLUBB_SGS
+     -shoc_sgs          Turns on SHOC_SGS
      -clubb_opts <list> Comma separated list of CLUBB options to turn on/off.  By default they are all off.  Current
                         options are: clubb_do_adv(Advect CLUBB moments), clubb_do_deep(CLUBB does the deep convection),
                         clubb_single_prec (Run CLUBB in single precision)
@@ -142,7 +143,8 @@ OPTIONS
      -mach <name>       Name of target system, for setting system-specific namelist defaults
      -max_n_rad_cnst <n> Maximum number of constituents that are either radiatively
                         active, or in any single diagnostic list for the radiation.
-     -microphys <name>  Specify the microphysics option [mg1 | mg1.5 | mg2 | rk].
+     -vbs               Activate vbs soa processes in the modal aerosol model.
+     -microphys <name>  Specify the microphysics option [mg1 | mg1.5 | mg2 | rk | p3].
      -nadv <n>          Set total number of advected species to <n>.
      -nadv_tt <n>       Set number of advected test tracers <n>.
      -nlev <n>          Set number of levels to <n>.
@@ -168,6 +170,10 @@ OPTIONS
      -e3smreplay        Configure E3SM to generate an IOP file that can be used to drive the SCM.
                         This switch only works with the Spectral Element dycore.
      -scam              Compiles model in single column mode.  Only works with SE dycore.
+     
+  Options relevent for doubly periodic cloud resolving model (CRM) mode:
+  
+     -dpcrm_mode
 
   EAM parallelization:
 
@@ -266,20 +272,24 @@ OPTIONS
 
   Options for MMF:
 
-     -use_MMF           Build the MMF configuration (super-parameterized EAM)
-     -use_MMF_VT        enable CRM variance transport (VT)
-     -use_MMF_ESMT      enable CRM explicit scalar momentum transport (ESMT)
-     -crm_nx <n>        CRM's x-grid.
-     -crm_ny <n>        CRM's y-grid.
-     -crm_nz <n>        CRM's z-grid.
-     -crm_dx <n>        CRM's horizontal grid spacing.
-     -crm_dt <n>        CRM's timestep.
-     -crm_nx_rad <n>    number of averaged columns for CRM radiation calculation in x direction
-     -crm_ny_rad <n>    number of averaged columns for CRM radiation calculation in y direction
-     -MMF_microphysics_scheme <string>   CRM microphysics package name [sam1mom | m2005 ].
-     -use_ECPP          use CRM clouds for vertical transport, aqueous chemistry and wet removable of aerosols
-     -crm_adv           CRM advection scheme [MPDATA | UM5]
-     -crm <model>       CRM model [sam | samomp | samxx]
+     -use_MMF                  Build the MMF configuration (super-parameterized EAM)
+     -use_MMF_VT               enable CRM variance transport (VT)
+     -use_MMF_ESMT             enable CRM explicit scalar momentum transport (ESMT)
+     -use_ECPP                 enable explicit-clouds-parameterized-pollutants scheme
+     -crm_nx <n>               CRM's x-grid.
+     -crm_ny <n>               CRM's y-grid.
+     -crm_nz <n>               CRM's z-grid.
+     -crm_dx <n>               CRM's horizontal grid spacing.
+     -crm_dt <n>               CRM's timestep.
+     -crm_nx_rad <n>           # of columns for CRM radiation calculation in x direction
+     -crm_ny_rad <n>           # of columns for CRM radiation calculation in y direction
+     -MMF_microphysics_scheme  CRM micro scheme - depends on CRM model [ sam1mom | p3 ].
+     -crm                      MMF CRM model            [ sam | samxx | pam]
+     -crm_adv                  SAM CRM advection scheme [ MPDATA | UM5]
+     -pam_dycor                PAM CRM dycor option     [ awfl | spam ]
+
+   Options for radiation:
+
      -rrtmgpxx          Use RRTMGP++ code
 EOF
 }
@@ -336,6 +346,7 @@ GetOptions(
     "cice_decomptype=s"         => \$opts{'cice_decomptype'},
     "clubb_sgs"                 => \$opts{'clubb_sgs'},
     "clubb_opts=s"              => \$opts{'clubb_opts'},
+    "shoc_sgs"                  => \$opts{'shoc_sgs'},
     "co2_cycle"                 => \$opts{'co2_cycle'},
     "comp_intf=s"               => \$opts{'comp_intf'},
     "cosp"                      => \$opts{'cosp'},
@@ -351,9 +362,10 @@ GetOptions(
     "crm_dt=s"                  => \$opts{'crm_dt'},
     "crm_nx_rad=s"              => \$opts{'crm_nx_rad'},
     "crm_ny_rad=s"              => \$opts{'crm_ny_rad'},
-    "MMF_microphysics_scheme=s"     => \$opts{'MMF_microphysics_scheme'},
+    "MMF_microphysics_scheme=s" => \$opts{'MMF_microphysics_scheme'},
     "crm_adv=s"                 => \$opts{'crm_adv'},
     "crm=s"                     => \$opts{'crm'},
+    "pam_dycor=s"               => \$opts{'pam_dycor'},
     "rrtmgpxx"                  => \$opts{'rrtmgpxx'},
     "debug"                     => \$opts{'debug'},
     "rain_evap_to_coarse_aero"  => \$opts{'rain_evap_to_coarse_aero'},
@@ -382,6 +394,7 @@ GetOptions(
     "lnd=s"                     => \$opts{'lnd'},
     "mach=s"                    => \$opts{'mach'},
     "max_n_rad_cnst=s"          => \$opts{'max_n_rad_cnst'},
+    "vbs"                       => \$opts{'vbs'},
     "microphys=s"               => \$opts{'microphys'},
     "mpi_inc=s"                 => \$opts{'mpi_inc'},
     "mpi_lib=s"                 => \$opts{'mpi_lib'},
@@ -407,6 +420,7 @@ GetOptions(
     "res=s"                     => \$opts{'res'},
     "rof=s"                     => \$opts{'rof'},
     "scam"                      => \$opts{'scam'},
+    "dpcrm_mode"                => \$opts{'dpcrm_mode'},
     "s|silent"                  => \$opts{'silent'},
     "smp!"                      => \$opts{'smp'},
     "spmd!"                     => \$opts{'spmd'},
@@ -840,6 +854,12 @@ if ($print>=2) { print "Maximum radiatively active tracers: $max_n_rad_cnst$eol"
 # So add it to the config object now.
 $cfg_ref->set('chem', $chem_pkg);
 
+# vbs option in mam
+if (defined $opts{'vbs'}) {
+   $cfg_ref->set('vbs', $opts{'vbs'});
+}
+my $vbs = $cfg_ref->get('vbs');
+
 # waccm physics
 if (defined $opts{'waccm_phys'}) {
     $cfg_ref->set('waccm_phys', $opts{'waccm_phys'});
@@ -935,10 +955,15 @@ if (defined $opts{'clubb_sgs'}) {
     $microphys_pkg = 'mg2';
 }
 
+#Set the default microphysics package for SHOC to mg2
+if (defined $opts{'shoc_sgs'}) {
+    $microphys_pkg = 'mg2';
+}
+
 # But if the physics package is adiabatic, ideal, change the default
 if ($phys_pkg =~ m/^ideal$|^adiabatic$/) {
     $microphys_pkg = 'rk';
-} elsif ($phys_pkg eq 'default' and !defined $opts{'clubb_sgs'}) {
+} elsif ($phys_pkg eq 'default' and !defined $opts{'clubb_sgs'} and !defined $opts{'shoc_sgs'}) {
     $microphys_pkg = 'mg1';
 }
 
@@ -966,11 +991,11 @@ my $clubb_sgs = $cfg_ref->get('clubb_sgs');
 
 # consistency checks...
 
-# CLUBB_SGS only works with mg microphysics
-if ($clubb_sgs and $microphys_pkg !~ m/^mg/) {
+# CLUBB_SGS only works with MG or P3 microphysics
+if ($clubb_sgs and $microphys_pkg !~ m/^mg/ and $microphys_pkg !~ m/^p3/) {
     die <<"EOF";
 **    ERROR: microphysics package set to: $microphys_pkg
-**    CLUBB_SGS only works with MG microphysics.
+**    CLUBB_SGS only works with MG or P3 microphysics.
 EOF
 }
 
@@ -991,11 +1016,30 @@ if ($print>=2) { print "clubb_do_adv=',$clubb_do_adv,$eol"; }
 if ($print>=2) { print "clubb_single_prec=',$clubb_single_prec,$eol"; }
 
 #-----------------------------------------------------------------------------------------------
+# SHOC
+
+if (defined $opts{'shoc_sgs'}) {
+    $cfg_ref->set('shoc_sgs', $opts{'shoc_sgs'});
+}
+my $shoc_sgs = $cfg_ref->get('shoc_sgs');
+
+# consistency checks...
+
+# SHOC_SGS only works with mg or p3 microphysics
+if ($shoc_sgs and $microphys_pkg !~ m/^mg/ and $microphys_pkg !~ m/^p3/) {
+    die <<"EOF";
+**    ERROR: microphysics package set to: $microphys_pkg
+**    SHOC_SGS only works with MG or P3 microphysics.
+EOF
+}
+
+#-----------------------------------------------------------------------------------------------
 # Macro-physics package
 
 my $macrophys_pkg = 'park';
 if ($phys_pkg =~ /ideal|adiabatic/) { $macrophys_pkg = 'none'; }
 if ($clubb_sgs == 1) { $macrophys_pkg = 'clubb_sgs'; }
+if ($shoc_sgs == 1) { $macrophys_pkg = 'shoc_sgs'; }
 $cfg_ref->set('macrophys', $macrophys_pkg);
 if ($print>=2) { print "Macrophysics package: $macrophys_pkg$eol"; }
 
@@ -1007,9 +1051,9 @@ my $pbl_pkg = 'uw';
 if ($phys_pkg =~ m/ideal|adiabatic/) {
     $pbl_pkg = 'hb';
 }
-
 # Override if using CLUBB
 if ($clubb_sgs == 1) { $pbl_pkg = 'clubb_sgs'; }
+if ($shoc_sgs == 1){ $pbl_pkg = 'shoc_sgs'; }
 
 # Allow the user to override the default via the commandline.
 if (defined $opts{'pbl'}) { $pbl_pkg = lc($opts{'pbl'}); }
@@ -1202,6 +1246,23 @@ EOF
 if ($print>=2) { print "EAM single column mode (SCAM): $scam$eol"; }
 
 #-----------------------------------------------------------------------------------------------
+# Doubly periodic (DP) cloud resolving model (CRM) mode
+if (defined $opts{'dpcrm_mode'}) {
+    $cfg_ref->set('dpcrm_mode', 1);
+}
+my $dpcrm_mode = $cfg_ref->get('dpcrm_mode') ? "ON" : "OFF";
+
+# Currently only Spectral Element dycores support DP CRM mode
+if ($dpcrm_mode eq 'ON' and $dyn_pkg ne 'se') {
+    die <<"EOF";
+**  ERROR: Doubly periodic cloud resolving model only works with Spectral Element dycore.
+**         Requested dycore is: $dyn_pkg
+EOF
+}
+
+if ($print>=2) { print "DP CRM mode: $dpcrm_mode$eol"; }
+
+#-----------------------------------------------------------------------------------------------
 # Generate IOP
 if (defined $opts{'e3smreplay'}) {
     $cfg_ref->set('e3smreplay', 1);
@@ -1237,6 +1298,7 @@ if (defined $opts{'use_MMF'}) {
     if (defined $opts{'crm_nx_rad'}) { $cfg_ref->set('crm_nx_rad', $opts{'crm_nx_rad'}); }
     if (defined $opts{'crm_ny_rad'}) { $cfg_ref->set('crm_ny_rad', $opts{'crm_ny_rad'}); }
     if (defined $opts{'crm_adv'}) { $cfg_ref->set('crm_adv', $opts{'crm_adv'}); }
+    if (defined $opts{'pam_dycor'})    { $cfg_ref->set('pam_dycor', $opts{'pam_dycor'}); }
     $cfg_ref->set('MMF_microphysics_scheme', $opts{'MMF_microphysics_scheme'});
     $cfg_ref->set('crm', $opts{'crm'});
     if (defined $opts{'use_MMF_VT'})   { $cfg_ref->set('use_MMF_VT',   1); }
@@ -1338,7 +1400,12 @@ if (!$prog_species) {
   $cfg_ref->set('chem_src_dir', $chem_src_dir);
 }
 
-if (($chem_pkg ne 'none') || ($prog_species)) {
+if ($chem_pkg eq 'spa'){
+    $chem_src_dir = "$cam_root/components/eam/src/chemistry/pp_none";
+    $cfg_ref->set('chem_src_dir', $chem_src_dir);
+}
+
+if ((($chem_pkg ne 'none') && ($chem_pkg ne 'spa')) || ($prog_species)) {
 
     # customize chemistry
     my $edit_chem_mech = $cfg_ref->get('edit_chem_mech');
@@ -1370,6 +1437,8 @@ if ($chem_pkg =~ '_mam3') {
     $chem_cppdefs = ' -DMODAL_AERO -DMODAL_AERO_3MODE ';
 } elsif ($chem_pkg =~ '_mam4_mom' || $chem_pkg =~ '_mam4_resus_mom' ) {
     $chem_cppdefs = ' -DMODAL_AERO -DMODAL_AERO_4MODE_MOM ';
+} elsif ($chem_pkg =~ '_mam5' ) {
+    $chem_cppdefs = ' -DMODAL_AERO -DMODAL_AERO_5MODE ';
 } elsif ($chem_pkg =~ '_mam4' ) {
     $chem_cppdefs = ' -DMODAL_AERO -DMODAL_AERO_4MODE ';
 } elsif ($chem_pkg =~ '_mam7') {
@@ -1381,11 +1450,9 @@ if ($chem_pkg =~ '_mam3') {
 if ($bc_dep_to_snow_updates == 1) {
     $chem_cppdefs = "$chem_cppdefs  -DMODAL_AER"
 }
-
-if ($rain_evap_to_coarse_aero == 1 && ($chem_pkg =~ '_mam3' || $chem_pkg =~ '_mam4' || $chem_pkg eq 'trop_mam4_resus' || $chem_pkg eq 'trop_mam4_resus_soag' || $chem_pkg eq 'trop_mam4_resus_mom')) {
+if ($rain_evap_to_coarse_aero == 1 && ($chem_pkg =~ '_mam3' || $chem_pkg =~ '_mam4' || $chem_pkg eq 'trop_mam4_resus' || $chem_pkg eq 'trop_mam4_resus_soag' || $chem_pkg eq 'trop_mam4_resus_mom' || $chem_pkg =~ 'linoz_mam7_resus_mom' ||  $chem_pkg =~ 'trop_strat_mam7_resus_mom'||  $chem_pkg =~ '_mam5')) {
     $chem_cppdefs = "$chem_cppdefs  -DRAIN_EVAP_TO_COARSE_AERO "
 }
-
 #-----------------------------------------------------------------------------------------------
 # Number of advected constituents
 my $nadv;
@@ -1419,10 +1486,19 @@ else {
             $nadv += 8;
             if ($print>=2) { print "Advected constituents added by $microphys_pkg microphysics: 8$eol"; }
         }
+        elsif ($microphys_pkg =~/^p3/) {
+            $nadv += 8;
+            if ($print>=2) { print "Advected constituents added by $microphys_pkg microphysics: 8$eol"; }
+	}
 
         if ($clubb_do_adv) {
             $nadv += 9;
                 if ($print>=2) { print "Advected constituents added by $microphys_pkg microphysics: 8$eol"; }
+        }
+
+        if ($shoc_sgs){
+            $nadv += 1;
+            if ($print>=2) { print "Advected constituents added by SHOC: 1$eol";}
         }
 
         # co2_cycle
@@ -1690,6 +1766,19 @@ if (defined $opts{'cppdefs'}) {
 }
 $cfg_ref->set('cppdefs', $usr_cppdefs);
 
+# Define is_scream_config flag to select which P3 version codes to use
+# If the config uses both p3 and shoc, it is recognized as a scream case.
+ 
+my $is_scream_config = 0;
+if ($microphys_pkg =~ /^p3/) {
+   if ($shoc_sgs) {
+      $is_scream_config = 1;
+      print "The case uses SCREAM config and SCREAM's version of P3 codes in Fortran 90.\n";
+   } else {
+      print "The case use EAM's version of P3 codes in Fortran 90.\n";
+   }
+}
+
 if ($usr_cppdefs and $print>=2) { print "Default and user CPP definitions: \'$usr_cppdefs\'$eol";}
 
 # The following CPP macro definitions are used to implement the compile-time options.  They are
@@ -1729,12 +1818,16 @@ if (defined $opts{'use_MMF'}) {
     my $crm_nx_rad = $cfg_ref->get('crm_nx_rad');
     my $crm_ny_rad = $cfg_ref->get('crm_ny_rad');
     my $crm = $cfg_ref->get('crm');
+    my $pam_dycor = $cfg_ref->get('pam_dycor');
     my $MMF_microphysics_scheme = $cfg_ref->get('MMF_microphysics_scheme');
     my $crm_adv = $cfg_ref->get('crm_adv');
     my $yes3Dval = 1;
     if ($crm_ny eq 1) {$yes3Dval = 0;}
     if (defined $opts{'crm_adv'}) { $cfg_cppdefs .= " -D_$crm_adv "; }
-    $cfg_cppdefs .= " -D$MMF_microphysics_scheme -DYES3DVAL=$yes3Dval";
+    $cfg_cppdefs .= " -DYES3DVAL=$yes3Dval";
+    if ($MMF_microphysics_scheme eq 'sam1mom') {
+        $cfg_cppdefs .= " -D$MMF_microphysics_scheme ";
+    }
     $cfg_cppdefs .= " -DCRM_NX=$crm_nx -DCRM_NY=$crm_ny -DCRM_NZ=$crm_nz ";
     $cfg_cppdefs .= " -DCRM_DX=$crm_dx -DCRM_DT=$crm_dt ";
     if (defined $opts{'use_ECPP'}) { $cfg_cppdefs .= " -DECPP " }
@@ -1749,13 +1842,14 @@ if (defined $opts{'use_MMF'}) {
         $cfg_cppdefs .= " -DCRM_NY_RAD=$crm_ny "
     }
     if ($crm_ny eq 1) {$yes3Dval = 0;}
-    my $crm = $cfg_ref->get('crm');
     if    ($crm eq 'sam') {
         $cfg_cppdefs .= " -DMMF_SAM "
-    } elsif ($crm eq 'samomp') {
-        $cfg_cppdefs .= " -DMMF_SAMOMP"
     } elsif ($crm eq 'samxx') {
         $cfg_cppdefs .= " -DMMF_SAMXX "
+    } elsif ($crm eq 'pam') {
+        $cfg_cppdefs .= " -DMMF_PAM ";
+        if ($pam_dycor eq 'awfl') { $cfg_cppdefs .= " -DMMF_PAM_DYCOR_AWFL " }
+        if ($pam_dycor eq 'spam') { $cfg_cppdefs .= " -DMMF_PAM_DYCOR_SPAM " }
     }
 
 }
@@ -1780,7 +1874,7 @@ if (!$ccsm_seq){
 # on some older compilers used by HOMME standalone.
 if ($dyn_pkg eq 'se') {
     my $csnp = $cfg_ref->get('csnp');
-    $cfg_cppdefs .= " -DNP=$csnp -DNC=4 -DHAVE_F2003_PTR_BND_REMAP";
+    $cfg_cppdefs .= " -DNP=$csnp -DHAVE_F2003_PTR_BND_REMAP";
     if ($smp eq 'ON') {
       $cfg_cppdefs .= " -DHORIZ_OPENMP"
     }
@@ -1828,6 +1922,9 @@ if ( ($ccsm_seq) and ($spmd eq 'ON') ) { $cfg_cppdefs .= " -DSPMD"; }
 # Chem CPP defs
 $cfg_cppdefs .= $chem_cppdefs;
 
+#vbs option in mam
+if ($vbs) { $cfg_cppdefs .= ' -DVBS_SOA'; }
+
 #WACCM-X extended thermosphere/ionosphere model
 if ($waccmx) { $cfg_cppdefs .= ' -DWACCMX'; }
 
@@ -1851,6 +1948,11 @@ if ($clubb_sgs == 1) {
     else{
         $cfg_cppdefs .= " -DCLUBB_REAL_TYPE=dp";
     }
+}
+
+# SHOC
+if ($shoc_sgs == 1){
+    $cfg_cppdefs .= ' -DSHOC_SGS';
 }
 
 # GPTL Timing library
@@ -2216,10 +2318,6 @@ if ($cosp) {
     unless (-d $bld_dir or mkdirp($bld_dir)) {
         die "** Could not create the cosp build directory: $bld_dir\n";
     }
-
-    # Create the COSP Makefile from a template and copy it into the cosp bld directory
-    write_cosp_makefile("$cfgdir/../src/physics/cosp2/Makefile.cospinline.in", "$cosp_libdir/Makefile");
-    if ($print) { print "creating $cosp_libdir/Makefile\n"; }
 }
 
 
@@ -2396,7 +2494,7 @@ my $fp_filename      = 'Filepath';             # name of output filepath file
 my $cpp_filename     = 'CIME_cppdefs';         # name of output file for eam's cppdefs in cime
 
 # Write the filepath file.
-write_filepath("$cam_bld/$fp_filename", $cfg_ref);
+write_filepath("$cam_bld/$fp_filename", $cfg_ref, $is_scream_config);
 if ($print) { print "creating $cam_bld/$fp_filename\n"; }
 
 if (($ccsm_seq)) {
@@ -2440,7 +2538,7 @@ exit;
 
 sub write_filepath
 {
-    my ($file, $cfg_ref) = @_;
+    my ($file, $cfg_ref, $is_scream_config) = @_;
     my  $fh = new IO::File;
 
     $fh->open(">$file") or die "** can't open filepath file: $file\n";
@@ -2464,6 +2562,7 @@ sub write_filepath
     my $ice           = $cfg_ref->get('ice');
     my $rof           = $cfg_ref->get('rof');
     my $caseroot      = $cfg_ref->get('caseroot');
+    my $crm           = $cfg_ref->get('crm');
 
     # Root directory
     my $camsrcdir = "$cam_root/components";
@@ -2498,6 +2597,7 @@ sub write_filepath
 
         # interface and base model code
         print $fh "$camsrcdir/eam/src/physics/crm\n";
+        print $fh "$camsrcdir/eam/src/physics/crm/dummy_modules\n";
 
         # MMF-specific radiation drivers (overrides default drivers that exist
         # in each individual radiation package; done this way to avoid
@@ -2512,7 +2612,6 @@ sub write_filepath
             print $fh "$camsrcdir/eam/src/physics/crm/ecpp\n";
         }
 
-        my $crm = $cfg_ref->get('crm');
         if ($crm eq 'sam') {
           #####################################################
           ## -crm sam will GLOB directories for CMake
@@ -2523,13 +2622,9 @@ sub write_filepath
           my $MMF_microphysics_scheme = $cfg_ref->get('MMF_microphysics_scheme');
           if ($MMF_microphysics_scheme eq 'sam1mom') {
               print $fh "$camsrcdir/eam/src/physics/crm/sam/MICRO_SAM1MOM\n";
-          } elsif ($MMF_microphysics_scheme eq 'm2005') {
-              print $fh "$camsrcdir/eam/src/physics/crm/sam/MICRO_M2005\n";
           }
-
           # turbulence closure
           print $fh "$camsrcdir/eam/src/physics/crm/sam/SGS_TKE\n";
-
           # advection scheme
           my $crm_adv = 'MPDATA';
           if (defined $opts{'crm_adv'}) { $crm_adv = $cfg_ref->get('crm_adv'); }
@@ -2540,40 +2635,6 @@ sub write_filepath
           } else {
             die "configure ERROR: invalid option - crm_adv: $crm_adv.\n";
           }
-
-        } elsif ($crm eq 'samomp') {
-          #####################################################
-          ## -crm samomp will GLOB directories for CMake
-          ######################################################
-          print $fh "$camsrcdir/eam/src/physics/crm/samomp\n";
-          #
-          # microphysics
-          my $MMF_microphysics_scheme = $cfg_ref->get('MMF_microphysics_scheme');
-          if ($MMF_microphysics_scheme eq 'sam1mom') {
-              print $fh "$camsrcdir/eam/src/physics/crm/samomp/MICRO_SAM1MOM\n";
-          } elsif ($MMF_microphysics_scheme eq 'm2005') {
-              print $fh "$camsrcdir/eam/src/physics/crm/samomp/MICRO_M2005\n";
-          }
-
-          # turbulence closure
-          print $fh "$camsrcdir/eam/src/physics/crm/samomp/SGS_TKE\n";
-
-          # advection scheme
-          my $crm_adv = 'MPDATA';
-          if (defined $opts{'crm_adv'}) { $crm_adv = $cfg_ref->get('crm_adv'); }
-          if ($crm_adv eq 'MPDATA') {
-            print $fh "$camsrcdir/eam/src/physics/crm/sam/ADV_MPDATA\n";
-          } elsif ($crm_adv eq 'UM5') {
-            print $fh "$camsrcdir/eam/src/physics/crm/sam/ADV_UM5\n";
-          } else {
-            die "configure ERROR: invalid option - crm_adv: $crm_adv.\n";
-          }
-                              
-        } elsif ($crm eq 'samxx') {
-          #####################################################
-          ## -crm samxx will add_subdirectory in CMake rather
-          ##            than GLOBing.
-          #####################################################
         }
 
     }
@@ -2634,6 +2695,14 @@ sub write_filepath
        print $fh "$camsrcdir/eam/src/physics/silhs\n";
     }
 
+    if (not(defined $opts{'use_MMF'})) {
+       if ($is_scream_config eq '1') {
+          print $fh "$camsrcdir/eam/src/physics/p3/scream\n";
+       } else {
+          print $fh "$camsrcdir/eam/src/physics/p3/eam\n";
+       }
+    }
+
     print $fh "$camsrcdir/eam/src/dynamics/$dyn\n";
     if($dyn eq 'se') {
       print $fh "$camsrcdir/homme/src/share\n";
@@ -2653,6 +2722,7 @@ sub write_filepath
       elsif ($opts{'dyn_target'} eq 'preqx_kokkos') {
         print $fh "$camsrcdir/homme/src/share/cxx\n";
         print $fh "$camsrcdir/homme/src/share/cxx/mpi\n";
+        print $fh "$camsrcdir/homme/src/share/cxx/utilities\n";
         print $fh "$camsrcdir/homme/src/preqx_kokkos\n";
         print $fh "$camsrcdir/homme/src/preqx_kokkos/cxx\n";
         print $fh "$camsrcdir/homme/src/preqx/share\n";
@@ -2661,6 +2731,7 @@ sub write_filepath
       elsif ($opts{'dyn_target'} eq 'theta-l_kokkos') {
         print $fh "$camsrcdir/homme/src/share/cxx\n";
         print $fh "$camsrcdir/homme/src/share/cxx/mpi\n";
+        print $fh "$camsrcdir/homme/src/share/cxx/utilities\n";
         print $fh "$camsrcdir/homme/src/theta-l_kokkos\n";
         print $fh "$camsrcdir/homme/src/theta-l_kokkos/cxx\n";
         print $fh "$camsrcdir/homme/src/theta-l/share\n";
@@ -2767,6 +2838,7 @@ sub write_cppdefs
     my  $fh = new IO::File;
 
     my $dyn           = $cfg_ref->get('dyn');
+    my $crm           = $cfg_ref->get('crm');
 
     print "Writing CPPDEFS for EAM in $file, with $dyn and $opts{'dyn_target'}\n";
 

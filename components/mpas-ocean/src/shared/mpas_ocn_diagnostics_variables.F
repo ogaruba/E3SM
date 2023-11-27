@@ -56,6 +56,7 @@ module ocn_diagnostics_variables
    real (kind=RKIND), dimension(:,:), pointer :: salineContractCoeff
    real (kind=RKIND), dimension(:,:), pointer :: BruntVaisalaFreqTop
    real (kind=RKIND), dimension(:,:), pointer :: tangentialVelocity
+   real (kind=RKIND), dimension(:,:), pointer :: layerThickEdgeDrag
    real (kind=RKIND), dimension(:,:), pointer :: layerThickEdgeFlux
    real (kind=RKIND), dimension(:,:), pointer :: layerThickEdgeMean
    real (kind=RKIND), dimension(:,:), pointer :: kineticEnergyCell
@@ -88,7 +89,8 @@ module ocn_diagnostics_variables
    real (kind=RKIND), dimension(:,:), pointer :: landIceBoundaryLayerTracers
    real (kind=RKIND), dimension(:,:), pointer :: landIceTracerTransferVelocities
 
-   integer, pointer :: indexBLT, indexBLS, indexHeatTrans, indexSaltTrans
+   integer :: indexBLT, indexBLS, &
+              indexHeatTrans, indexSaltTrans
 
    real (kind=RKIND), dimension(:), pointer :: penetrativeTemperatureFluxOBL
    real (kind=RKIND), dimension(:), pointer :: bottomLayerShortwaveTemperatureFlux
@@ -119,13 +121,12 @@ module ocn_diagnostics_variables
    real (kind=RKIND), dimension(:,:), pointer :: velocityZonal
 
    real(kind=RKIND), dimension(:,:), pointer :: gmKappaScaling
-   real(kind=RKIND), dimension(:,:), pointer :: RediKappaScaling
    real(kind=RKIND), dimension(:,:), pointer :: RediKappaSfcTaper
    real(kind=RKIND), dimension(:,:), pointer :: k33
    real(kind=RKIND), dimension(:,:), pointer :: gradDensityEddy
    real(kind=RKIND), dimension(:), pointer   :: gmBolusKappa
    real(kind=RKIND), dimension(:), pointer   :: cGMphaseSpeed
-   real(kind=RKIND), dimension(:,:,:), pointer :: slopeTriadUp, slopeTriadDown
+   real(kind=RKIND), dimension(:,:,:), pointer :: limiterUp, limiterDown, slopeTriadUp, slopeTriadDown
 
    integer, dimension(:), pointer :: indMLD
    real(kind=RKIND), dimension(:), pointer :: dThreshMLD
@@ -136,7 +137,7 @@ module ocn_diagnostics_variables
    real (kind=RKIND), dimension(:,:), pointer :: viscosity
    real (kind=RKIND), dimension(:,:), pointer :: vertViscTopOfEdge
    real (kind=RKIND), dimension(:,:), pointer :: vertViscTopOfCell
-   real (kind=RKIND), dimension(:,:), pointer :: wettingVelocity
+   real (kind=RKIND), dimension(:,:), pointer :: wettingVelocityFactor
    type (field2DReal), pointer :: wettingVelocityField
 
    real (kind=RKIND), dimension(:,:), pointer :: vertDiffTopOfCell
@@ -168,7 +169,7 @@ module ocn_diagnostics_variables
    real (kind=RKIND), dimension(:), pointer :: boundaryLayerDepth
    real (kind=RKIND), dimension(:), pointer :: boundaryLayerDepthSmooth
    real (kind=RKIND), dimension(:), pointer :: indexBoundaryLayerDepth
-   integer, pointer :: index_vertNonLocalFluxTemp
+   integer :: index_vertNonLocalFluxTemp
 
    real (kind=RKIND), dimension(:), pointer :: salinitySurfaceRestoringTendency
 
@@ -183,8 +184,8 @@ module ocn_diagnostics_variables
    real (kind=RKIND), dimension(:), pointer :: barotropicThicknessFlux
 
    real (kind=RKIND), dimension(:, :), pointer :: SSHGradient
-   integer, pointer :: indexSurfaceVelocityZonal, indexSurfaceVelocityMeridional
-   integer, pointer :: indexSSHGradientZonal, indexSSHGradientMeridional
+   integer :: indexSurfaceVelocityZonal, indexSurfaceVelocityMeridional
+   integer :: indexSSHGradientZonal, indexSSHGradientMeridional
 
    type (field1DInteger), pointer :: smoothingMaskField
    type (field2DReal), pointer :: verticalStretchField
@@ -199,6 +200,9 @@ module ocn_diagnostics_variables
    real (kind=RKIND), dimension(:), pointer :: SIvec_t0,SIvec_t1 ,SIvec_q0 ,SIvec_q1 ,SIvec_qh0
    real (kind=RKIND), dimension(:), pointer :: SIvec_w0,SIvec_w1 ,SIvec_wh0,SIvec_wh1,SIvec_y0
    real (kind=RKIND), dimension(:), pointer :: SIvec_z0,SIvec_z1 ,SIvec_zh0,SIvec_zh1
+
+   ! Split-explicit AB2 Array Pointers
+   real (kind=RKIND), dimension(:,:), pointer :: normalVelocityTendOld, CoriolisTermOld
 
    !--------------------------------------------------------------------
    !
@@ -235,6 +239,16 @@ contains
 
       type (mpas_pool_type), pointer :: diagnosticsPool
 
+      ! Local pointers for pool retrievals
+      integer, pointer :: &
+         indexBLTPtr, indexBLSPtr, &
+         indexHeatTransPtr, indexSaltTransPtr, &
+         index_vertNonLocalFluxTempPtr, &
+         indexSurfaceVelocityZonalPtr, &
+         indexSurfaceVelocityMeridionalPtr, &
+         indexSSHGradientZonalPtr, &
+         indexSSHGradientMeridionalPtr
+
       err = 0
 
       call mpas_pool_get_subpool(domain % blocklist % structs, 'diagnostics', diagnosticsPool)
@@ -244,17 +258,15 @@ contains
       end if
 
       if ( trim(config_ocean_run_mode) == 'forward' ) then
-         call mpas_pool_get_array(diagnosticsPool, 'wettingVelocity', &
-                   wettingVelocity)
-         call mpas_pool_get_field(diagnosticsPool, 'wettingVelocity', &
+         call mpas_pool_get_array(diagnosticsPool, 'wettingVelocityFactor', &
+                   wettingVelocityFactor)
+         call mpas_pool_get_field(diagnosticsPool, 'wettingVelocityFactor', &
                    wettingVelocityField)
       end if
 
       if (config_use_GM.or.config_use_Redi) then
          call mpas_pool_get_array(diagnosticsPool, 'RediKappa', &
                    RediKappa)
-         call mpas_pool_get_array(diagnosticsPool, 'RediKappaScaling', &
-                   RediKappaScaling)
          call mpas_pool_get_array(diagnosticsPool, 'RediKappaSfcTaper', &
                    RediKappaSfcTaper)
          call mpas_pool_get_array(diagnosticsPool, 'rediLimiterCount', &
@@ -318,13 +330,18 @@ contains
          call mpas_pool_get_array(diagnosticsPool, 'topDrag', topDrag)
          call mpas_pool_get_array(diagnosticsPool, 'topDragMagnitude', topDragMag)
          call mpas_pool_get_dimension(diagnosticsPool, &
-                   'index_landIceBoundaryLayerTemperature', indexBLT)
+                   'index_landIceBoundaryLayerTemperature', indexBLTPtr)
          call mpas_pool_get_dimension(diagnosticsPool, &
-                   'index_landIceBoundaryLayerSalinity', indexBLS)
+                   'index_landIceBoundaryLayerSalinity', indexBLSPtr)
          call mpas_pool_get_dimension(diagnosticsPool, &
-                   'index_landIceHeatTransferVelocity', indexHeatTrans)
+                   'index_landIceHeatTransferVelocity', indexHeatTransPtr)
          call mpas_pool_get_dimension(diagnosticsPool, &
-                   'index_landIceSaltTransferVelocity', indexSaltTrans)
+                   'index_landIceSaltTransferVelocity', indexSaltTransPtr)
+         indexBLT = indexBLTPtr
+         indexBLS = indexBLSPtr
+         indexHeatTrans = indexHeatTransPtr
+         indexSaltTrans = indexSaltTransPtr
+
          call mpas_pool_get_array(diagnosticsPool, &
                    'landIceBoundaryLayerTracers', landIceBoundaryLayerTracers)
          call mpas_pool_get_array(diagnosticsPool, &
@@ -403,6 +420,10 @@ contains
                    slopeTriadUp)
          call mpas_pool_get_array(diagnosticsPool, 'slopeTriadDown', &
                    slopeTriadDown)
+         call mpas_pool_get_array(diagnosticsPool, 'limiterUp', &
+                   limiterUp)
+         call mpas_pool_get_array(diagnosticsPool, 'limiterDown', &
+                   limiterDown)
 
          ! GM-related fields
          call mpas_pool_get_array(diagnosticsPool, 'cGMphaseSpeed', &
@@ -442,6 +463,8 @@ contains
          call mpas_pool_get_array(diagnosticsPool, 'vertMLEBolusVelocityTop', &
                    vertMLEBolusVelocityTop)
 
+         call mpas_pool_get_array(diagnosticsPool, 'layerThicknessEdgeDrag', &
+                   layerThickEdgeDrag)
          call mpas_pool_get_array(diagnosticsPool, 'layerThicknessEdgeFlux', &
                    layerThickEdgeFlux)
          call mpas_pool_get_array(diagnosticsPool, 'layerThicknessEdgeMean', &
@@ -535,16 +558,16 @@ contains
          ! Set pointer for index variables
          call mpas_pool_get_dimension(diagnosticsPool, &
                   'index_surfaceVelocityZonal', &
-                   indexSurfaceVelocityZonal)
+                   indexSurfaceVelocityZonalPtr)
          call mpas_pool_get_dimension(diagnosticsPool, &
                   'index_surfaceVelocityMeridional', &
-                   indexSurfaceVelocityMeridional)
+                   indexSurfaceVelocityMeridionalPtr)
          call mpas_pool_get_dimension(diagnosticsPool, &
                   'index_vertNonLocalFluxTemp', &
-                   index_vertNonLocalFluxTemp)
+                   index_vertNonLocalFluxTempPtr)
          call mpas_pool_get_dimension(diagnosticsPool, &
                   'index_SSHGradientMeridional', &
-                   indexSSHGradientMeridional)
+                   indexSSHGradientMeridionalPtr)
          call mpas_pool_get_array(diagnosticsPool, &
                   'indexSurfaceLayerDepth', &
                    indexSurfaceLayerDepth)
@@ -553,7 +576,12 @@ contains
                    indexBoundaryLayerDepth)
          call mpas_pool_get_dimension(diagnosticsPool, &
                   'index_SSHGradientZonal', &
-                   indexSSHGradientZonal)
+                   indexSSHGradientZonalPtr)
+         indexSurfaceVelocityZonal = indexSurfaceVelocityZonalPtr
+         indexSurfaceVelocityMeridional = indexSurfaceVelocityMeridionalPtr
+         index_vertNonLocalFluxTemp = index_vertNonLocalFluxTempPtr
+         indexSSHGradientMeridional = indexSSHGradientMeridionalPtr
+         indexSSHGradientZonal = indexSSHGradientZonalPtr
       end if
 
       call mpas_pool_get_array(diagnosticsPool, &
@@ -645,15 +673,16 @@ contains
          call mpas_pool_get_array(diagnosticsPool, 'SIvec_zh1', SIvec_zh1)
       end if
 
+      if (trim(config_time_integrator) == 'split_explicit_ab2') then
+         call mpas_pool_get_array(diagnosticsPool, 'normalVelocityTendOld', normalVelocityTendOld)
+         call mpas_pool_get_array(diagnosticsPool, 'CoriolisTermOld', CoriolisTermOld)
+      end if
+
       ! Copy diagnostic variables to accelerator
       if ( trim(config_land_ice_flux_mode) /= 'off' ) then
          !$acc enter data create(                                 &
          !$acc                   topDrag,                         &
          !$acc                   topDragMag,                      &
-         !$acc                   indexBLT,                        &
-         !$acc                   indexBLS,                        &
-         !$acc                   indexHeatTrans,                  &
-         !$acc                   indexSaltTrans,                  &
          !$acc                   landIceBoundaryLayerTracers,     &
          !$acc                   landIceTracerTransferVelocities, &
          !$acc                   landIceFrictionVelocity)
@@ -699,15 +728,18 @@ contains
          !$acc                   SSHGradient,                     &
          !$acc                   circulation,                     &
          !$acc                   slopeTriadUp,                    &
+         !$acc                   limiterUp,                       &
          !$acc                   gradSSHZonal,                    &
          !$acc                   cGMphaseSpeed,                   &
          !$acc                   velocityZonal,                   &
          !$acc                   GMStreamFuncX,                   &
          !$acc                   GMStreamFuncY,                   &
          !$acc                   GMStreamFuncZ,                   &
+         !$acc                   layerThickEdgeDrag,              &
          !$acc                   layerThickEdgeFlux,              &
          !$acc                   layerThickEdgeMean,              &
          !$acc                   slopeTriadDown,                  &
+         !$acc                   limiterDown,                     &
          !$acc                   normRelVortEdge,                 &
          !$acc                   surfaceVelocity,                 &
          !$acc                   vertVelocityTop,                 &
@@ -736,7 +768,6 @@ contains
          !$acc                   mleVelocityZonal,                &
          !$acc                   bulkRichardsonNumber,            &
          !$acc                   gmStreamFuncTopOfEdge,           &
-         !$acc                   indexSSHGradientZonal,           &
          !$acc                   relativeVorticityCell,           &
          !$acc                   normalGMBolusVelocity,           &
          !$acc                   normalMLEvelocity,               &
@@ -756,19 +787,15 @@ contains
          !$acc                   GMBolusVelocityMeridional,       &
          !$acc                   mleVelocityMeridional,           &
          !$acc                   bulkRichardsonNumberShear,       &
-         !$acc                   indexSurfaceVelocityZonal,       &
          !$acc                   normalVelocitySurfaceLayer,      &
-         !$acc                   index_vertNonLocalFluxTemp,      &
-         !$acc                   indexSSHGradientMeridional,      &
          !$acc                   transportVelocityMeridional,     &
          !$acc                   penetrativeTemperatureFluxOBL,   &
-         !$acc                   indexSurfaceVelocityMeridional,  &
          !$acc                   normalizedRelativeVorticityCell  &
          !$acc                   )
       end if
       if ( trim(config_ocean_run_mode) == 'forward' ) then
-         !$acc enter data create( &
-         !$acc                   wettingVelocity              &
+         !$acc enter data copyin( &
+         !$acc                   wettingVelocityFactor            &
          !$acc                   )
       end if
       if (config_use_GM.or.config_use_Redi) then
@@ -776,7 +803,6 @@ contains
          !$acc                   RediKappa,         &
          !$acc                   gmBolusKappa,      &
          !$acc                   gmKappaScaling,    &
-         !$acc                   RediKappaScaling,  &
          !$acc                   rediLimiterCount,  &
          !$acc                   RediKappaSfcTaper, &
          !$acc                   RediHorizontalTaper,  &
@@ -835,6 +861,12 @@ contains
          !$acc                   SIvec_zh0,             &
          !$acc                   SIvec_zh1,             &
          !$acc                   barotropicCoriolisTerm &
+         !$acc                   )
+      end if
+      if ( trim(config_time_integrator) == 'split_explicit_ab2' ) then
+         !$acc enter data create(                       &
+         !$acc                   normalVelocityTendOld, &
+         !$acc                   CoriolisTermOld
          !$acc                   )
       end if
 
@@ -899,11 +931,7 @@ contains
       if ( trim(config_land_ice_flux_mode) /= 'off' ) then
          !$acc exit data delete(                                  &
          !$acc                   topDrag,                         &
-         !$acc                   indexBLT,                        &
-         !$acc                   indexBLS,                        &
          !$acc                   topDragMag,                      &
-         !$acc                   indexHeatTrans,                  &
-         !$acc                   indexSaltTrans,                  &
          !$acc                   landIceBoundaryLayerTracers,     &
          !$acc                   landIceTracerTransferVelocities, &
          !$acc                   landIceFrictionVelocity)
@@ -949,12 +977,15 @@ contains
          !$acc                   SSHGradient,                     &
          !$acc                   circulation,                     &
          !$acc                   slopeTriadUp,                    &
+         !$acc                   limiterUp,                       &
+         !$acc                   limiterDown,                     &
          !$acc                   gradSSHZonal,                    &
          !$acc                   cGMphaseSpeed,                   &
          !$acc                   velocityZonal,                   &
          !$acc                   GMStreamFuncX,                   &
          !$acc                   GMStreamFuncY,                   &
          !$acc                   GMStreamFuncZ,                   &
+         !$acc                   layerThickEdgeDrag,              &
          !$acc                   layerThickEdgeFlux,              &
          !$acc                   layerThickEdgeMean,              &
          !$acc                   slopeTriadDown,                  &
@@ -986,7 +1017,6 @@ contains
          !$acc                   mleVelocityZonal,                &
          !$acc                   bulkRichardsonNumber,            &
          !$acc                   gmStreamFuncTopOfEdge,           &
-         !$acc                   indexSSHGradientZonal,           &
          !$acc                   relativeVorticityCell,           &
          !$acc                   normalGMBolusVelocity,           &
          !$acc                   normalMLEvelocity,               &
@@ -1006,19 +1036,15 @@ contains
          !$acc                   mleVelocityMeridional,           &
          !$acc                   GMBolusVelocityMeridional,       &
          !$acc                   bulkRichardsonNumberShear,       &
-         !$acc                   indexSurfaceVelocityZonal,       &
          !$acc                   normalVelocitySurfaceLayer,      &
-         !$acc                   index_vertNonLocalFluxTemp,      &
-         !$acc                   indexSSHGradientMeridional,      &
          !$acc                   transportVelocityMeridional,     &
          !$acc                   penetrativeTemperatureFluxOBL,   &
-         !$acc                   indexSurfaceVelocityMeridional,  &
          !$acc                   normalizedRelativeVorticityCell  &
          !$acc                   )
       end if
       if ( trim(config_ocean_run_mode) == 'forward' ) then
          !$acc exit data delete(                              &
-         !$acc                   wettingVelocity              &
+         !$acc                   wettingVelocityFactor        &
          !$acc                   )
       end if
       if (config_use_GM.or.config_use_Redi) then
@@ -1026,7 +1052,6 @@ contains
          !$acc                   RediKappa,         &
          !$acc                   gmBolusKappa,      &
          !$acc                   gmKappaScaling,    &
-         !$acc                   RediKappaScaling,  &
          !$acc                   rediLimiterCount,  &
          !$acc                   RediKappaSfcTaper, &
          !$acc                   RediHorizontalTaper,  &
@@ -1087,6 +1112,12 @@ contains
          !$acc                   barotropicCoriolisTerm &
          !$acc                   )
       end if
+      if ( trim(config_time_integrator) == 'split_explicit_ab2' ) then
+         !$acc exit data delete(                       &
+         !$acc                  normalVelocityTendOld, &
+         !$acc                  CoriolisTermOld
+         !$acc                  )
+      end if
 
       !$acc exit data delete(                                          &
       !$acc                   zMid,                                    &
@@ -1118,10 +1149,6 @@ contains
       if ( trim(config_land_ice_flux_mode) /= 'off' ) then
          nullify(topDrag,                         &
                  topDragMag,                      &
-                 indexBLT,                        &
-                 indexBLS,                        &
-                 indexHeatTrans,                  &
-                 indexSaltTrans,                  &
                  landIceBoundaryLayerTracers,     &
                  landIceTracerTransferVelocities, &
                  landIceFrictionVelocity)
@@ -1157,12 +1184,15 @@ contains
                  SSHGradient,                     &
                  circulation,                     &
                  slopeTriadUp,                    &
+                 limiterUp,                       &
+                 limiterDown,                     &
                  gradSSHZonal,                    &
                  cGMphaseSpeed,                   &
                  velocityZonal,                   &
                  GMStreamFuncX,                   &
                  GMStreamFuncY,                   &
                  GMStreamFuncZ,                   &
+                 layerThickEdgeDrag,              &
                  layerThickEdgeFlux,              &
                  layerThickEdgeMean,              &
                  slopeTriadDown,                  &
@@ -1194,7 +1224,6 @@ contains
                  mleVelocityZonal,                &
                  bulkRichardsonNumber,            &
                  gmStreamFuncTopOfEdge,           &
-                 indexSSHGradientZonal,           &
                  relativeVorticityCell,           &
                  normalGMBolusVelocity,           &
                  normalMLEvelocity,               &
@@ -1214,23 +1243,18 @@ contains
                  mleVelocityMeridional,           &
                  GMBolusVelocityMeridional,       &
                  bulkRichardsonNumberShear,       &
-                 indexSurfaceVelocityZonal,       &
                  normalVelocitySurfaceLayer,      &
-                 index_vertNonLocalFluxTemp,      &
-                 indexSSHGradientMeridional,      &
                  transportVelocityMeridional,     &
                  penetrativeTemperatureFluxOBL,   &
-                 indexSurfaceVelocityMeridional,  &
                  normalizedRelativeVorticityCell)
       end if
       if ( trim(config_ocean_run_mode) == 'forward' ) then
-         nullify(wettingVelocity)
+         nullify(wettingVelocityFactor)
       end if
       if (config_use_GM.or.config_use_Redi) then
          nullify(RediKappa,         &
                  gmBolusKappa,      &
                  gmKappaScaling,    &
-                 RediKappaScaling,  &
                  rediLimiterCount,  &
                  RediKappaSfcTaper, &
                  RediHorizontalTaper, &
